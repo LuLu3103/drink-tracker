@@ -1,7 +1,7 @@
 {
   "name": "drink-tracker",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "个人咖啡 / 奶茶咖啡因与营养追踪工具（PWA）",
   "scripts": {

@@ -1,20 +1,13 @@
 import { useMemo } from 'react'
 import { useDrinkStore } from '@/store'
 import type { DrinkTemplate } from '@/types'
-import { getCategoryColor, getRiskColor } from '@/utils/format'
-import { Coffee, Clock, ChevronRight, Plus, AlertTriangle } from 'lucide-react'
+import { DrinkArtwork } from '@/components/DrinkArtwork'
+import { Plus, ChevronRight, Coffee, Moon } from 'lucide-react'
 
 interface RecordPageProps {
   onQuickRecord: (template: DrinkTemplate) => void
   onOpenPicker: () => void
   onOpenCustomDrink: () => void
-}
-
-const CATEGORY_EMOJI: Record<string, string> = {
-  coffee: '☕',
-  milk_tea: '🧋',
-  tea: '🍵',
-  other: '🥤',
 }
 
 export default function RecordPage({ onQuickRecord, onOpenPicker, onOpenCustomDrink }: RecordPageProps) {
@@ -27,173 +20,151 @@ export default function RecordPage({ onQuickRecord, onOpenPicker, onOpenCustomDr
   const cutoffInfo = useDrinkStore(s => s.cutoffInfo)
   const todayStats = useDrinkStore(s => s.todayStats)
 
-  const shortcutTemplates = useMemo(() => {
+  const shortcuts = useMemo(() => {
     const recentIds: string[] = []
     for (const log of logs) {
       if (log.templateId && !recentIds.includes(log.templateId)) recentIds.push(log.templateId)
-      if (recentIds.length >= 4) break
+      if (recentIds.length >= 6) break
     }
     const recent = recentIds
       .map(id => templates.find(t => t.id === id))
       .filter((t): t is DrinkTemplate => Boolean(t))
-    const favorites = templates.filter(t => t.isFavorite && !recentIds.includes(t.id))
-    return [...recent, ...favorites].slice(0, 6)
+    if (recent.length >= 4) return recent.slice(0, 6)
+    const favs = templates.filter(t => t.isFavorite && !recentIds.includes(t.id))
+    return [...recent, ...favs].slice(0, 6)
   }, [templates, logs])
 
-  const caffeinePct = Math.min(100, Math.round((todayStats.totalCaffeine / settings.dailyCaffeineTargetMg) * 100))
-  const sugarPct = Math.min(100, Math.round((todayStats.totalSugar / settings.dailySugarTargetG) * 100))
-  const caloriePct = Math.min(100, Math.round((todayStats.totalCalories / settings.dailyCalorieTargetKcal) * 100))
+  const pct = (v: number, target: number) => Math.min(100, Math.round((v / target) * 100))
+
+  const rows = [
+    { label: '咖啡因', value: Math.round(todayStats.totalCaffeine), unit: 'mg', target: settings.dailyCaffeineTargetMg, color: 'bg-brand-500' },
+    { label: '糖', value: Number(todayStats.totalSugar.toFixed(1)), unit: 'g', target: settings.dailySugarTargetG, color: 'bg-amber-400' },
+    { label: '热量', value: Math.round(todayStats.totalCalories), unit: 'kcal', target: settings.dailyCalorieTargetKcal, color: 'bg-rose-400' },
+  ]
 
   return (
-    <div className="h-full overflow-y-auto pb-24">
-      <div className="p-4 space-y-4">
-        <header className="flex items-center justify-between pt-1">
+    <div className="h-full overflow-y-auto">
+      <div className="px-5 pt-6 pb-32 space-y-5">
+        <header className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold">饮品记账本</h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              就寝 {settings.bedtime} · 半衰期 {settings.halfLifeHours}h · 阈值 {settings.sleepResidualThresholdMg}mg
+            <p className="text-[13px] text-ink-400 tracking-wide">
+              {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
             </p>
+            <h1 className="mt-1 text-[26px] font-semibold tracking-tight">饮品记账</h1>
           </div>
           <button
             onClick={onOpenPicker}
-            className="w-12 h-12 rounded-2xl bg-coffee text-white flex items-center justify-center shadow-lg shadow-coffee/30 active:scale-95 transition-transform"
             aria-label="新增记录"
+            className="mt-1 w-11 h-11 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-lift active:scale-95 transition-transform"
           >
-            <Plus className="w-6 h-6" />
+            <Plus className="w-5 h-5" />
           </button>
         </header>
 
-        <div className="card p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-primary-50 dark:bg-primary-900/30 p-3">
-              <div className="flex items-center gap-1.5 text-[11px] text-gray-500 mb-1">
-                <Coffee className="w-3.5 h-3.5" /> 当前体内残留
+        <section className="card p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 text-[12px] text-ink-400">
+                <Moon className="w-3.5 h-3.5" />
+                睡前预计残留
               </div>
-              <div className="text-2xl font-bold text-coffee leading-tight">
-                {Math.round(currentResidual)}
-                <span className="text-sm font-medium ml-0.5">mg</span>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-[34px] leading-none font-semibold tracking-tight" style={{ color: riskLevel.color }}>
+                  {Math.round(bedtimeResidual)}
+                </span>
+                <span className="text-sm text-ink-400">mg</span>
               </div>
-            </div>
-            <div className="rounded-xl p-3" style={{ backgroundColor: getRiskColor(riskLevel.level) + '18' }}>
-              <div className="flex items-center gap-1.5 text-[11px] text-gray-500 mb-1">
-                <Clock className="w-3.5 h-3.5" /> 睡前预计残留
-              </div>
-              <div className="text-2xl font-bold leading-tight" style={{ color: getRiskColor(riskLevel.level) }}>
-                {Math.round(bedtimeResidual)}
-                <span className="text-sm font-medium ml-0.5">mg</span>
+              <div className="mt-2 flex items-center gap-1.5 text-[12px] text-ink-400">
+                <Coffee className="w-3.5 h-3.5" />
+                当前体内 {Math.round(currentResidual)}mg · 今日 {todayStats.count} 杯
               </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={{ backgroundColor: getRiskColor(riskLevel.level) + '15' }}>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium text-white shrink-0" style={{ backgroundColor: getRiskColor(riskLevel.level) }}>
+            <span
+              className="chip text-[11px]"
+              style={{ backgroundColor: riskLevel.color + '14', color: riskLevel.color }}
+            >
               {riskLevel.label}
             </span>
-            <span className="text-xs text-gray-600 dark:text-gray-300 flex-1 min-w-0">
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 rounded-2xl bg-slate-50 dark:bg-slate-800/60 px-3.5 py-3">
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: riskLevel.color }} />
+            <span className="text-[12.5px] text-ink-500 dark:text-slate-300 leading-relaxed">
               {cutoffInfo.message}
             </span>
-            {cutoffInfo.isPast && <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />}
           </div>
-        </div>
+        </section>
 
-        <div className="card p-4">
+        <section className="card p-5">
+          <div className="flex items-baseline justify-between mb-4">
+            <h2 className="text-[15px] font-medium">今日摄入</h2>
+            <span className="text-[12px] text-ink-400">就寝 {settings.bedtime}</span>
+          </div>
+          <div className="space-y-3.5">
+            {rows.map(r => (
+              <div key={r.label}>
+                <div className="flex items-baseline justify-between text-[12.5px] mb-1.5">
+                  <span className="text-ink-500 dark:text-slate-400">{r.label}</span>
+                  <span className="font-medium">
+                    {r.value}
+                    <span className="text-ink-400 font-normal"> / {r.target}{r.unit}</span>
+                  </span>
+                </div>
+                <div className="h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div
+                    className={'h-full rounded-full transition-all duration-500 ' + r.color}
+                    style={{ width: pct(r.value, r.target) + '%' }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium">今日摄入</h3>
-            <span className="text-xs text-gray-400">{todayStats.count} 杯</span>
-          </div>
-
-          <div className="space-y-2.5">
-            <MetricBar label="咖啡因" value={todayStats.totalCaffeine} unit="mg" target={settings.dailyCaffeineTargetMg} pct={caffeinePct} color="#8B6914" />
-            <MetricBar label="糖" value={todayStats.totalSugar} unit="g" target={settings.dailySugarTargetG} pct={sugarPct} color="#F59E0B" decimals={1} />
-            <MetricBar label="热量" value={todayStats.totalCalories} unit="kcal" target={settings.dailyCalorieTargetKcal} pct={caloriePct} color="#EF4444" />
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-medium">常用饮品</h3>
-            <button onClick={onOpenPicker} className="text-sm text-coffee font-medium flex items-center gap-0.5">
-              全部 <ChevronRight className="w-4 h-4" />
+            <h2 className="text-[15px] font-medium">常用饮品</h2>
+            <button onClick={onOpenPicker} className="text-[12.5px] text-brand-600 font-medium flex items-center gap-0.5">
+              全部 <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {shortcutTemplates.length === 0 ? (
-            <button onClick={onOpenPicker} className="card w-full py-10 text-center text-gray-500">
-              <Coffee className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">还没有饮品模板</p>
-              <p className="text-xs text-gray-400 mt-1">点这里开始记录第一杯</p>
+          {shortcuts.length === 0 ? (
+            <button onClick={onOpenPicker} className="card w-full py-12 flex flex-col items-center text-ink-400">
+              <Coffee className="w-8 h-8 mb-2 opacity-40" />
+              <span className="text-[13px]">还没有饮品，点这里记录第一杯</span>
             </button>
           ) : (
-            <div className="grid grid-cols-2 gap-2.5">
-              {shortcutTemplates.map(t => (
+            <div className="grid grid-cols-2 gap-3">
+              {shortcuts.map(t => (
                 <button
                   key={t.id}
                   onClick={() => onQuickRecord(t)}
-                  className="card p-3 text-left active:scale-[0.98] transition-transform"
+                  className="card p-3.5 text-left active:scale-[0.98] transition-transform"
                 >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
-                      style={{ backgroundColor: getCategoryColor(t.category) + '20' }}
-                    >
-                      {CATEGORY_EMOJI[t.category]}
-                    </span>
-                    <span className="text-sm font-medium truncate">{t.name}</span>
+                  <div className="flex items-center gap-2.5">
+                    <DrinkArtwork art={t.art} size={40} className="shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] font-medium truncate">{t.name}</p>
+                      <p className="text-[11.5px] text-ink-400 truncate">{t.brand}</p>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-gray-500 truncate">{t.brand} · {t.size}</p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
+                  <p className="mt-1.5 text-[11px] text-ink-400">
                     {t.caffeineMg}mg · {t.sugarG}g · {t.caloriesKcal}kcal
                   </p>
                 </button>
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         <button onClick={onOpenCustomDrink} className="btn-secondary w-full">
           <Plus className="w-4 h-4 mr-1.5" /> 创建自定义饮品
         </button>
 
-        <p className="text-center text-[11px] text-gray-400 leading-relaxed pb-2">
-          估算基于一阶消除模型，结果仅供参考，不构成医疗建议
+        <p className="text-center text-[11px] leading-relaxed text-ink-400 pb-2">
+          基于一阶消除模型估算，仅供参考，不构成医疗建议
         </p>
-      </div>
-    </div>
-  )
-}
-
-function MetricBar({
-  label,
-  value,
-  unit,
-  target,
-  pct,
-  color,
-  decimals = 0,
-}: {
-  label: string
-  value: number
-  unit: string
-  target: number
-  pct: number
-  color: string
-  decimals?: number
-}) {
-  const over = value > target
-  return (
-    <div>
-      <div className="flex items-baseline justify-between text-xs mb-1">
-        <span className="text-gray-500">{label}</span>
-        <span className="font-medium">
-          {value.toFixed(decimals)}
-          <span className="text-gray-400"> / {target}{unit}</span>
-        </span>
-      </div>
-      <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: pct + '%', backgroundColor: over ? '#EF4444' : color }}
-        />
       </div>
     </div>
   )

@@ -1,22 +1,15 @@
 import { useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
 import { useDrinkStore } from '@/store'
 import type { DailyStats } from '@/types'
 import CaffeineChart from '@/components/CaffeineChart'
 import NutritionChart from '@/components/NutritionChart'
-import { Coffee, Cookie, Flame, CupSoda, PieChart, Clock3 } from 'lucide-react'
+import { getCategoryLabel } from '@/utils/format'
 
-const CATEGORY_LABEL: Record<string, string> = {
-  coffee: '咖啡',
-  milk_tea: '奶茶',
-  tea: '纯茶',
-  other: '其他',
-}
-const CATEGORY_EMOJI: Record<string, string> = {
-  coffee: '☕',
-  milk_tea: '🧋',
-  tea: '🍵',
-  other: '🥤',
+const CAT_COLOR: Record<string, string> = {
+  coffee: '#2563EB',
+  milk_tea: '#8B5CF6',
+  tea: '#10B981',
+  other: '#F59E0B',
 }
 
 export default function StatsPage() {
@@ -26,102 +19,104 @@ export default function StatsPage() {
   const settings = useDrinkStore(s => s.settings)
   const bedtimeResidual = useDrinkStore(s => s.bedtimeResidual)
   const riskLevel = useDrinkStore(s => s.riskLevel)
-  const caffeineCurve = useDrinkStore(s => s.caffeineCurve)
+  const curve = useDrinkStore(s => s.caffeineCurve)
   const logs = useDrinkStore(s => s.logs)
 
   const [range, setRange] = useState<'week' | 'month'>('week')
-
   const series: DailyStats[] = range === 'week' ? weeklyStats : monthlyStats
-  const dayCount = series.length || 1
+  const days = series.length || 1
 
-  const sum = (pick: (d: DailyStats) => number) => series.reduce((acc, d) => acc + pick(d), 0)
-  const avgCaffeine = sum(d => d.totalCaffeine) / dayCount
-  const avgSugar = sum(d => d.totalSugar) / dayCount
-  const avgCalories = sum(d => d.totalCalories) / dayCount
-  const overCaffeine = series.filter(d => d.totalCaffeine > settings.dailyCaffeineTargetMg).length
-  const overSugar = series.filter(d => d.totalSugar > settings.dailySugarTargetG).length
-  const overCalorie = series.filter(d => d.totalCalories > settings.dailyCalorieTargetKcal).length
+  const sum = (pick: (d: DailyStats) => number) => series.reduce((a, d) => a + pick(d), 0)
+  const avgCaffeine = sum(d => d.totalCaffeine) / days
+  const avgSugar = sum(d => d.totalSugar) / days
+  const avgCalories = sum(d => d.totalCalories) / days
+  const overCaf = series.filter(d => d.totalCaffeine > settings.dailyCaffeineTargetMg).length
+  const overSug = series.filter(d => d.totalSugar > settings.dailySugarTargetG).length
+  const overCal = series.filter(d => d.totalCalories > settings.dailyCalorieTargetKcal).length
 
-  const brandTop = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const log of logs) map.set(log.brand, (map.get(log.brand) || 0) + 1)
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  const brands = useMemo(() => {
+    const m = new Map<string, number>()
+    logs.forEach(l => m.set(l.brand, (m.get(l.brand) || 0) + 1))
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
   }, [logs])
 
-  const categoryDist = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const log of logs) map.set(log.category, (map.get(log.category) || 0) + 1)
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1])
+  const cats = useMemo(() => {
+    const m = new Map<string, number>()
+    logs.forEach(l => m.set(l.category, (m.get(l.category) || 0) + 1))
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1])
   }, [logs])
 
-  const timeDist = useMemo(() => {
-    const buckets = { morning: 0, afternoon: 0, evening: 0 }
-    for (const log of logs) {
-      const h = new Date(log.consumedAt).getHours()
-      if (h < 12) buckets.morning++
-      else if (h < 18) buckets.afternoon++
-      else buckets.evening++
-    }
-    return buckets
+  const times = useMemo(() => {
+    const b = { morning: 0, afternoon: 0, evening: 0 }
+    logs.forEach(l => {
+      const h = new Date(l.consumedAt).getHours()
+      if (h < 12) b.morning++
+      else if (h < 18) b.afternoon++
+      else b.evening++
+    })
+    return b
   }, [logs])
 
-  const maxBrand = brandTop.length > 0 ? brandTop[0][1] : 1
-  const maxCat = categoryDist.length > 0 ? categoryDist[0][1] : 1
+  const maxBrand = brands.length ? brands[0][1] : 1
+  const maxCat = cats.length ? cats[0][1] : 1
 
   return (
-    <div className="h-full overflow-y-auto pb-24">
-      <div className="p-4 space-y-4">
-        <h1 className="text-2xl font-bold pt-1">统计</h1>
+    <div className="h-full overflow-y-auto">
+      <div className="px-5 pt-6 pb-28 space-y-4">
+        <h1 className="text-[22px] font-semibold tracking-tight">统计</h1>
 
-        <div className="card p-4">
-          <div className="flex items-start justify-between mb-2">
+        <section className="card p-5">
+          <div className="flex items-start justify-between">
             <div>
-              <h3 className="font-semibold">咖啡因代谢曲线</h3>
-              <p className="text-[11px] text-gray-500">过去 12 小时 → 就寝后 2 小时</p>
+              <p className="text-[12px] text-ink-400">睡前预计残留</p>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-[30px] leading-none font-semibold tracking-tight" style={{ color: riskLevel.color }}>
+                  {Math.round(bedtimeResidual)}
+                </span>
+                <span className="text-[13px] text-ink-400">mg</span>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold leading-tight" style={{ color: riskLevel.color }}>
-                {Math.round(bedtimeResidual)}
-                <span className="text-sm font-medium">mg</span>
-              </p>
-              <p className="text-[11px] font-medium" style={{ color: riskLevel.color }}>{riskLevel.label} · 睡前</p>
-            </div>
+            <span className="chip text-[11px]" style={{ backgroundColor: riskLevel.color + '14', color: riskLevel.color }}>
+              {riskLevel.label}
+            </span>
           </div>
-          <CaffeineChart curve={caffeineCurve} bedtime={settings.bedtime} threshold={settings.sleepResidualThresholdMg} />
+          <div className="mt-3">
+            <CaffeineChart curve={curve} bedtime={settings.bedtime} threshold={settings.sleepResidualThresholdMg} />
+          </div>
+        </section>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Metric label="今日咖啡因" value={Math.round(todayStats.totalCaffeine)} unit="mg" target={settings.dailyCaffeineTargetMg} color="#2563EB" />
+          <Metric label="今日糖" value={Number(todayStats.totalSugar.toFixed(1))} unit="g" target={settings.dailySugarTargetG} color="#F59E0B" />
+          <Metric label="今日热量" value={Math.round(todayStats.totalCalories)} unit="kcal" target={settings.dailyCalorieTargetKcal} color="#FB7185" />
+          <Metric label="今日杯数" value={todayStats.count} unit="杯" target={0} color="#64748B" />
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <TodayCard icon={<Coffee className="w-4 h-4" />} label="咖啡因" value={Math.round(todayStats.totalCaffeine)} unit="mg" target={settings.dailyCaffeineTargetMg} color="#8B6914" />
-          <TodayCard icon={<Cookie className="w-4 h-4" />} label="糖" value={Number(todayStats.totalSugar.toFixed(1))} unit="g" target={settings.dailySugarTargetG} color="#F59E0B" />
-          <TodayCard icon={<Flame className="w-4 h-4" />} label="热量" value={Math.round(todayStats.totalCalories)} unit="kcal" target={settings.dailyCalorieTargetKcal} color="#EF4444" />
-          <TodayCard icon={<CupSoda className="w-4 h-4" />} label="杯数" value={todayStats.count} unit="杯" target={0} color="#3B82F6" />
-        </div>
-
-        <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-          <button
-            onClick={() => setRange('week')}
-            className={'flex-1 py-2 rounded-lg text-sm font-medium transition-colors ' + (range === 'week' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500')}
-          >
-            本周
-          </button>
-          <button
-            onClick={() => setRange('month')}
-            className={'flex-1 py-2 rounded-lg text-sm font-medium transition-colors ' + (range === 'month' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500')}
-          >
-            本月
-          </button>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2.5">
-          <AvgCard label="日均咖啡因" value={Math.round(avgCaffeine)} unit="mg" target={settings.dailyCaffeineTargetMg} color="#8B6914" />
-          <AvgCard label="日均糖" value={Number(avgSugar.toFixed(1))} unit="g" target={settings.dailySugarTargetG} color="#F59E0B" />
-          <AvgCard label="日均热量" value={Math.round(avgCalories)} unit="kcal" target={settings.dailyCalorieTargetKcal} color="#EF4444" />
+        <div className="inline-flex rounded-2xl bg-slate-100 p-1 dark:bg-slate-800">
+          {(['week', 'month'] as const).map(r => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={
+                'px-5 py-1.5 rounded-xl text-[12.5px] font-medium transition-colors ' +
+                (range === r ? 'bg-white text-ink-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-ink-400')
+              }
+            >
+              {r === 'week' ? '本周' : '本月'}
+            </button>
+          ))}
         </div>
 
         <div className="grid grid-cols-3 gap-2.5">
-          <OverCard label="咖啡因超标" count={overCaffeine} total={series.length} color="#8B6914" />
-          <OverCard label="糖超标" count={overSugar} total={series.length} color="#F59E0B" />
-          <OverCard label="热量超标" count={overCalorie} total={series.length} color="#EF4444" />
+          <Mini label="日均咖啡因" value={Math.round(avgCaffeine)} unit="mg" color="#2563EB" />
+          <Mini label="日均糖" value={Number(avgSugar.toFixed(1))} unit="g" color="#F59E0B" />
+          <Mini label="日均热量" value={Math.round(avgCalories)} unit="kcal" color="#FB7185" />
+        </div>
+
+        <div className="grid grid-cols-3 gap-2.5">
+          <Over label="咖啡因超标" count={overCaf} total={series.length} color="#2563EB" />
+          <Over label="糖超标" count={overSug} total={series.length} color="#F59E0B" />
+          <Over label="热量超标" count={overCal} total={series.length} color="#FB7185" />
         </div>
 
         <NutritionChart
@@ -131,136 +126,106 @@ export default function StatsPage() {
           calorieTarget={settings.dailyCalorieTargetKcal}
         />
 
-        {brandTop.length > 0 && (
-          <div className="card p-4">
-            <h3 className="font-medium mb-3 flex items-center gap-1.5">
-              <PieChart className="w-4 h-4" /> 品牌分布 TOP 5
-            </h3>
-            <div className="space-y-2.5">
-              {brandTop.map(([brand, count], i) => (
-                <div key={brand} className="flex items-center gap-2">
-                  <span className="w-4 text-xs text-gray-400 text-right">{i + 1}</span>
-                  <span className="w-20 text-xs truncate">{brand}</span>
-                  <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                    <div className="h-full rounded-full bg-coffee" style={{ width: (count / maxBrand) * 100 + '%' }} />
+        {brands.length > 0 && (
+          <section className="card p-5">
+            <h3 className="text-[13.5px] font-medium mb-3.5">品牌分布</h3>
+            <div className="space-y-3">
+              {brands.map(([brand, count], i) => (
+                <div key={brand} className="flex items-center gap-2.5">
+                  <span className="w-3 text-[11px] text-ink-400">{i + 1}</span>
+                  <span className="w-20 text-[12px] truncate">{brand}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div className="h-full rounded-full bg-brand-500" style={{ width: (count / maxBrand) * 100 + '%' }} />
                   </div>
-                  <span className="text-xs text-gray-500 w-10 text-right">{count} 杯</span>
+                  <span className="text-[11px] text-ink-400 w-9 text-right">{count} 杯</span>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <div className="card p-4">
-            <h3 className="font-medium mb-3">品类分布</h3>
-            {categoryDist.length === 0 && <p className="text-xs text-gray-400">暂无数据</p>}
+        <div className="grid grid-cols-2 gap-3">
+          <section className="card p-4">
+            <h3 className="text-[13px] font-medium mb-3">品类</h3>
+            {cats.length === 0 && <p className="text-[11.5px] text-ink-400">暂无数据</p>}
             <div className="space-y-2.5">
-              {categoryDist.map(([cat, count]) => (
-                <div key={cat} className="flex items-center gap-2">
-                  <span className="text-sm">{CATEGORY_EMOJI[cat] || '🥤'}</span>
-                  <span className="flex-1 text-xs">{CATEGORY_LABEL[cat] || cat}</span>
-                  <div className="w-12 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                    <div className="h-full rounded-full bg-coffee" style={{ width: (count / maxCat) * 100 + '%' }} />
+              {cats.map(([c, n]) => (
+                <div key={c} className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: CAT_COLOR[c] || '#94A3B8' }} />
+                  <span className="flex-1 text-[11.5px]">{getCategoryLabel(c)}</span>
+                  <div className="w-10 h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: (n / maxCat) * 100 + '%', backgroundColor: CAT_COLOR[c] || '#94A3B8' }} />
                   </div>
-                  <span className="text-[11px] text-gray-500 w-8 text-right">{count}</span>
+                  <span className="text-[10.5px] text-ink-400 w-6 text-right">{n}</span>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
-          <div className="card p-4">
-            <h3 className="font-medium mb-3 flex items-center gap-1.5">
-              <Clock3 className="w-4 h-4" /> 时段分布
-            </h3>
-            <div className="space-y-2.5 text-xs">
-              <TimeRow icon="🌅" label="上午" sub="6-12" value={timeDist.morning} />
-              <TimeRow icon="☀️" label="下午" sub="12-18" value={timeDist.afternoon} />
-              <TimeRow icon="🌙" label="晚上" sub="18-24" value={timeDist.evening} />
+          <section className="card p-4">
+            <h3 className="text-[13px] font-medium mb-3">时段</h3>
+            <div className="space-y-2.5 text-[11.5px]">
+              <TimeRow label="上午" sub="6-12" value={times.morning} />
+              <TimeRow label="下午" sub="12-18" value={times.afternoon} />
+              <TimeRow label="晚上" sub="18-24" value={times.evening} />
             </div>
-          </div>
+          </section>
         </div>
 
-        <p className="text-center text-[11px] text-gray-400 pb-2">摄入估算，非代谢曲线；时间按本地时区自然日聚合</p>
+        <p className="text-center text-[11px] text-ink-400 pb-2">摄入估算，非代谢曲线</p>
       </div>
     </div>
   )
 }
 
-function TodayCard({
-  icon,
-  label,
-  value,
-  unit,
-  target,
-  color,
-}: {
-  icon: ReactNode
-  label: string
-  value: number
-  unit: string
-  target: number
-  color: string
-}) {
+function Metric({ label, value, unit, target, color }: { label: string; value: number; unit: string; target: number; color: string }) {
   const pct = target > 0 ? Math.min(100, (value / target) * 100) : 0
-  const over = target > 0 && value > target
   return (
-    <div className="card p-3">
-      <div className="flex items-center gap-1.5 text-[11px] text-gray-500 mb-1">
-        <span style={{ color }}>{icon}</span>
-        {label}
-      </div>
-      <p className="text-xl font-bold leading-tight">
+    <div className="card p-4">
+      <p className="text-[11.5px] text-ink-400">{label}</p>
+      <p className="mt-1 text-[20px] font-semibold leading-none">
         {value}
-        <span className="text-xs font-normal text-gray-400 ml-0.5">{unit}</span>
+        <span className="text-[11px] font-normal text-ink-400 ml-0.5">{unit}</span>
       </p>
       {target > 0 && (
-        <>
-          <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 mt-2 overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: pct + '%', backgroundColor: over ? '#EF4444' : color }} />
-          </div>
-          <p className="text-[10px] text-gray-400 mt-1">目标 {target}{unit}</p>
-        </>
+        <div className="mt-2.5 h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+          <div className="h-full rounded-full" style={{ width: pct + '%', backgroundColor: color }} />
+        </div>
       )}
     </div>
   )
 }
 
-function AvgCard({ label, value, unit, target, color }: { label: string; value: number; unit: string; target: number; color: string }) {
-  const pct = target > 0 ? Math.min(100, (value / target) * 100) : 0
+function Mini({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
   return (
-    <div className="card p-3">
-      <p className="text-[11px] text-gray-500">{label}</p>
-      <p className="text-lg font-bold leading-tight mt-0.5" style={{ color }}>
+    <div className="card-flat p-3">
+      <p className="text-[10.5px] text-ink-400">{label}</p>
+      <p className="mt-0.5 text-[15px] font-semibold" style={{ color }}>
         {value}
-        <span className="text-[10px] font-normal text-gray-400 ml-0.5">{unit}</span>
+        <span className="text-[10px] font-normal text-ink-400 ml-0.5">{unit}</span>
       </p>
-      <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 mt-2 overflow-hidden">
-        <div className="h-full rounded-full" style={{ width: pct + '%', backgroundColor: color }} />
-      </div>
     </div>
   )
 }
 
-function OverCard({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
+function Over({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
   return (
-    <div className="card p-3 text-center" style={{ borderLeft: '3px solid ' + color }}>
-      <p className="text-xl font-bold leading-tight" style={{ color }}>{count}</p>
-      <p className="text-[10px] text-gray-400">/ {total} 天</p>
-      <p className="text-[11px] text-gray-500 mt-0.5">{label}</p>
+    <div className="card-flat p-3 text-center">
+      <p className="text-[17px] font-semibold" style={{ color }}>{count}</p>
+      <p className="text-[10px] text-ink-400">/ {total} 天</p>
+      <p className="text-[10.5px] text-ink-500 mt-0.5">{label}</p>
     </div>
   )
 }
 
-function TimeRow({ icon, label, sub, value }: { icon: string; label: string; sub: string; value: number }) {
+function TimeRow({ label, sub, value }: { label: string; sub: string; value: number }) {
   return (
     <div className="flex items-center gap-2">
-      <span>{icon}</span>
       <span className="flex-1">
         {label}
-        <span className="text-[10px] text-gray-400 ml-1">{sub}</span>
+        <span className="text-[10px] text-ink-400 ml-1">{sub}</span>
       </span>
-      <span className="font-medium">{value} 杯</span>
+      <span className="font-medium">{value}</span>
     </div>
   )
 }

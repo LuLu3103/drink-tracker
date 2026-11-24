@@ -1,154 +1,120 @@
 import { useEffect, useRef } from 'react'
 import echarts, { type EChartsInstance } from '@/utils/echarts'
 
-interface NutritionChartProps {
+interface Props {
   stats: Array<{ date: string; count: number; totalCaffeine: number; totalSugar: number; totalCalories: number }>
   caffeineTarget: number
   sugarTarget: number
   calorieTarget: number
 }
 
-export default function NutritionChart({ stats, caffeineTarget, sugarTarget, calorieTarget }: NutritionChartProps) {
-  const caffeineChartRef = useRef<HTMLDivElement>(null)
-  const sugarChartRef = useRef<HTMLDivElement>(null)
-  const calorieChartRef = useRef<HTMLDivElement>(null)
-  
-  const chartInstances = useRef<Record<string, EChartsInstance>>({})
-  
+const SERIES = [
+  { key: 'caffeine', name: '咖啡因', unit: 'mg', color: '#2563EB' },
+  { key: 'sugar', name: '糖', unit: 'g', color: '#F59E0B' },
+  { key: 'calorie', name: '热量', unit: 'kcal', color: '#FB7185' },
+] as const
+
+export default function NutritionChart({ stats, caffeineTarget, sugarTarget, calorieTarget }: Props) {
+  const refs = {
+    caffeine: useRef<HTMLDivElement>(null),
+    sugar: useRef<HTMLDivElement>(null),
+    calorie: useRef<HTMLDivElement>(null),
+  }
+  const instances = useRef<Record<string, EChartsInstance>>({})
+  const targets = { caffeine: caffeineTarget, sugar: sugarTarget, calorie: calorieTarget }
+
   useEffect(() => {
-    if (!caffeineChartRef.current || !sugarChartRef.current || !calorieChartRef.current) return
-    
-    const charts = ['caffeine', 'sugar', 'calorie'] as const
-    const refs = { caffeine: caffeineChartRef, sugar: sugarChartRef, calorie: calorieChartRef }
-    const targets = { caffeine: caffeineTarget, sugar: sugarTarget, calorie: calorieTarget }
-    const colors = { caffeine: '#8B6914', sugar: '#F59E0B', calorie: '#EF4444' }
-    const units = { caffeine: 'mg', sugar: 'g', calorie: 'kcal' }
-    const names = { caffeine: '咖啡因', sugar: '糖', calorie: '热量' }
-    
-    charts.forEach(key => {
-      const ref = refs[key].current
-      if (!ref) return
-      
-      if (!chartInstances.current[key]) {
-        chartInstances.current[key] = echarts.init(ref)
-      }
-      const chart = chartInstances.current[key]
-      
-      const data = stats.map(s => ({
-        date: new Date(s.date + 'T00:00:00').toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }),
-        value: key === 'caffeine' ? s.totalCaffeine : key === 'sugar' ? s.totalSugar : s.totalCalories
+    SERIES.forEach(s => {
+      const el = refs[s.key].current
+      if (!el) return
+      if (!instances.current[s.key]) instances.current[s.key] = echarts.init(el)
+      const chart = instances.current[s.key]
+      const target = targets[s.key]
+
+      const data = stats.map(d => ({
+        label: new Date(d.date + 'T00:00:00').toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }),
+        value: s.key === 'caffeine' ? d.totalCaffeine : s.key === 'sugar' ? d.totalSugar : d.totalCalories,
       }))
-      
+
       const option: any = {
         animation: false,
-        grid: {
-          left: 40,
-          right: 10,
-          top: 10,
-          bottom: 30
-        },
+        grid: { left: 38, right: 8, top: 10, bottom: 28 },
         xAxis: {
           type: 'category',
-          data: data.map(d => d.date),
-          axisLine: { lineStyle: { color: '#e5e7eb' } },
-          axisLabel: { color: '#9ca3af', fontSize: 10, rotate: 30 },
+          data: data.map(d => d.label),
+          axisLine: { lineStyle: { color: '#E2E8F0' } },
           axisTick: { show: false },
-          boundaryGap: true
+          axisLabel: { color: '#94A3B8', fontSize: 9.5, rotate: 30 },
         },
         yAxis: {
           type: 'value',
           min: 0,
+          minInterval: 1,
           axisLine: { show: false },
           axisTick: { show: false },
-          axisLabel: { color: '#9ca3af', fontSize: 10 },
-          splitLine: { lineStyle: { color: '#f3f4f6' } }
+          axisLabel: { color: '#94A3B8', fontSize: 9.5, formatter: (v: number) => String(Math.round(v)) },
+          splitLine: { lineStyle: { color: '#F1F5F9' } },
         },
         series: [
           {
-            name: names[key],
             type: 'bar',
             data: data.map(d => d.value),
-            barWidth: '60%',
+            barWidth: '52%',
             itemStyle: {
-              color: (params: any) => {
-                return params.value > targets[key] 
-                  ? { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
-                      { offset: 0, color: colors[key] },
-                      { offset: 1, color: colors[key] + '80' }
-                    ] }
-                  : { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
-                      { offset: 0, color: colors[key] + '40' },
-                      { offset: 1, color: colors[key] + '10' }
-                    ] }
-              }
+              borderRadius: [6, 6, 0, 0],
+              color: (params: any) =>
+                params.value > target
+                  ? s.color
+                  : {
+                      type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                      colorStops: [
+                        { offset: 0, color: s.color + 'CC' },
+                        { offset: 1, color: s.color + '4D' },
+                      ],
+                    },
             },
-            emphasis: { itemStyle: { color: colors[key] } }
-          },
-          {
-            name: '目标线',
-            type: 'line',
-            data: data.map(() => targets[key]),
-            symbol: 'none',
-            lineStyle: { color: colors[key], type: 'dashed', width: 1 },
-            showSymbol: false,
             markLine: {
               silent: true,
-              data: [{ yAxis: targets[key] }],
-              label: { show: false }
-            }
-          }
+              symbol: 'none',
+              data: [{ yAxis: target }],
+              lineStyle: { color: s.color, type: 'dashed', width: 1, opacity: 0.7 },
+              label: { show: false },
+            },
+          },
         ],
         tooltip: {
           trigger: 'axis',
           formatter: (params: any) => {
-            const bar = params.find((p: any) => p.seriesType === 'bar')
-            if (!bar) return ''
-            return `<strong>${bar.name}</strong><br/>${names[key]}: <strong>${bar.value.toFixed(1)}${units[key]}</strong><br/>目标: ${targets[key]}${units[key]}`
+            const p = Array.isArray(params) ? params[0] : params
+            if (!p) return ''
+            return '<b>' + p.name + '</b><br/>' + s.name + ' <b>' + Number(p.value).toFixed(1) + s.unit + '</b><br/>目标 ' + target + s.unit
           },
-          backgroundColor: 'rgba(17, 24, 39, 0.9)',
-          borderColor: colors[key],
-          textStyle: { color: '#fff' }
-        }
+          backgroundColor: 'rgba(15,23,42,0.92)',
+          borderColor: 'transparent',
+          textStyle: { color: '#fff', fontSize: 12 },
+        },
       }
-      
       chart.setOption(option, true)
     })
-    
-    const resizeHandler = () => {
-      Object.values(chartInstances.current).forEach(c => c.resize())
-    }
-    window.addEventListener('resize', resizeHandler)
-    
-    return () => {
-      window.removeEventListener('resize', resizeHandler)
-    }
+
+    const onResize = () => Object.values(instances.current).forEach(c => c.resize())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stats, caffeineTarget, sugarTarget, calorieTarget])
-  
+
   return (
-    <div className="space-y-6">
-      <div className="card p-4">
-        <h3 className="font-medium mb-4 flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#8B6914' }}></span>
-          咖啡因每日总量
-        </h3>
-        <div ref={caffeineChartRef} className="h-48 w-full" style={{ minHeight: '180px' }} />
-      </div>
-      
-      <div className="card p-4">
-        <h3 className="font-medium mb-4 flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#F59E0B' }}></span>
-          糖每日总量
-        </h3>
-        <div ref={sugarChartRef} className="h-48 w-full" style={{ minHeight: '180px' }} />
-      </div>
-      
-      <div className="card p-4">
-        <h3 className="font-medium mb-4 flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#EF4444' }}></span>
-          热量每日总量
-        </h3>
-        <div ref={calorieChartRef} className="h-48 w-full" style={{ minHeight: '180px' }} />
-      </div>
+    <div className="space-y-3">
+      {SERIES.map(s => (
+        <div key={s.key} className="card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+            <h3 className="text-[13.5px] font-medium">{s.name}每日总量</h3>
+            <span className="ml-auto text-[11px] text-ink-400">目标 {targets[s.key]}{s.unit}</span>
+          </div>
+          <div ref={refs[s.key]} className="w-full" style={{ height: 140 }} />
+        </div>
+      ))}
     </div>
   )
 }

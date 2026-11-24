@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { DrinkTemplate, DrinkLog, Settings, CaffeinePoint, DailyStats, RiskLevel, CutoffInfo } from '@/types'
-import { db, initDB, DEFAULT_SETTINGS } from '@/db'
+import { db, initDB, DEFAULT_SETTINGS, BRAND_ORDER } from '@/db'
 import { newId } from '@/utils/id'
 
 export type ToastType = 'success' | 'error' | 'info'
@@ -193,11 +193,23 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
 
       loadAll: async () => {
         await initDB()
-        const [templates, logs, settings] = await Promise.all([
+        const [rawTemplates, logs, settings] = await Promise.all([
           db.templates.toArray(),
           db.logs.orderBy('consumedAt').reverse().toArray(),
           db.settings.get(1)
         ])
+
+        const rank = (brand: string) => {
+          const i = BRAND_ORDER.indexOf(brand)
+          return i === -1 ? BRAND_ORDER.length : i
+        }
+        const templates = rawTemplates.sort((a, b) => {
+          if (Boolean(a.isFavorite) !== Boolean(b.isFavorite)) return a.isFavorite ? -1 : 1
+          const ra = rank(a.brand)
+          const rb = rank(b.brand)
+          if (ra !== rb) return ra - rb
+          return a.name.localeCompare(b.name, 'zh')
+        })
         
         const finalSettings = settings || DEFAULT_SETTINGS
         

@@ -1,292 +1,163 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import type { Settings } from '@/types'
 import { useDrinkStore } from '@/store'
-import { X, Download, Upload, Trash2, AlertTriangle } from 'lucide-react'
+import { X } from 'lucide-react'
+
+function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+  return (
+    <div>
+      <label className="block text-[12px] text-ink-400 mb-1.5">{label}</label>
+      {children}
+      {hint && <p className="mt-1 text-[11px] text-ink-400">{hint}</p>}
+    </div>
+  )
+}
 
 export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const { settings, updateSettings, exportData, importData, clearAllData, showToast } = useDrinkStore()
-  const [localSettings, setLocalSettings] = useState(settings)
-  const [importJson, setImportJson] = useState('')
-  const [showImportDialog, setShowImportDialog] = useState(false)
-  const [showClearConfirm, setShowClearConfirm] = useState(false)
-  const [exportJson, setExportJson] = useState('')
-  const [showExportDialog, setShowExportDialog] = useState(false)
-  
+  const settings = useDrinkStore(s => s.settings)
+  const updateSettings = useDrinkStore(s => s.updateSettings)
+  const exportData = useDrinkStore(s => s.exportData)
+  const importData = useDrinkStore(s => s.importData)
+  const showToast = useDrinkStore(s => s.showToast)
+
+  const [form, setForm] = useState<Settings>(settings)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [exportText, setExportText] = useState<string | null>(null)
+
   useEffect(() => {
-    setLocalSettings(settings)
-  }, [settings])
-  
-  const handleSave = async () => {
-    try {
-      await updateSettings(localSettings)
-      showToast('设置已保存', 'success')
-      onClose()
-    } catch (error) {
-      showToast('保存失败', 'error')
-    }
+    if (isOpen) setForm(settings)
+  }, [isOpen, settings])
+
+  if (!isOpen) return null
+
+  const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm(f => ({ ...f, [k]: v }))
+
+  const save = async () => {
+    await updateSettings(form)
+    showToast('设置已保存', 'success')
+    onClose()
   }
-  
-  const handleExport = async () => {
-    try {
-      const json = await exportData()
-      setExportJson(json)
-      setShowExportDialog(true)
-    } catch (error) {
-      showToast('导出失败', 'error')
-    }
+
+  const doExport = async () => {
+    const json = await exportData()
+    setExportText(json)
   }
-  
-  const copyExport = () => {
-    navigator.clipboard.writeText(exportJson)
-    showToast('已复制到剪贴板', 'success')
-  }
-  
-  const downloadExport = () => {
-    const blob = new Blob([exportJson], { type: 'application/json' })
+
+  const download = () => {
+    if (!exportText) return
+    const blob = new Blob([exportText], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `drink-tracker-backup-${new Date().toISOString().split('T')[0]}.json`
+    a.download = 'drink-tracker-' + new Date().toISOString().slice(0, 10) + '.json'
     a.click()
     URL.revokeObjectURL(url)
-    showToast('文件已下载', 'success')
+    setExportText(null)
+    showToast('已下载备份', 'success')
   }
-  
-  const handleImport = async () => {
-    if (!importJson.trim()) {
-      showToast('请粘贴 JSON 数据', 'error')
-      return
-    }
+
+  const doImport = async () => {
     try {
-      await importData(importJson)
+      await importData(importText)
       showToast('导入成功', 'success')
-      setImportJson('')
-      setShowImportDialog(false)
+      setImportOpen(false)
+      setImportText('')
       onClose()
-    } catch (error) {
-      showToast('导入失败：数据格式错误', 'error')
+    } catch {
+      showToast('导入失败：数据格式不正确', 'error')
     }
   }
-  
-  const handleClear = async () => {
-    try {
-      await clearAllData()
-      showToast('所有数据已清空', 'success')
-      setShowClearConfirm(false)
-      onClose()
-    } catch (error) {
-      showToast('清空失败', 'error')
-    }
-  }
-  
-  if (!isOpen) return null
-  
+
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="modal-backdrop" onClick={onClose} />
-      <div className="relative z-10 w-full bg-white dark:bg-gray-950 rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col animate-slide-up">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white/95 dark:bg-gray-950/95 backdrop-blur-sm z-10 rounded-t-3xl">
-          <h2 className="text-lg font-semibold">设置</h2>
-          <button onClick={onClose} aria-label="关闭" className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800">
-            <X className="w-6 h-6" />
+      <div className="sheet max-h-[92vh]">
+        <div className="sheet-handle" />
+        <div className="flex items-center justify-between px-5 pb-3 pt-1">
+          <h2 className="text-[17px] font-semibold">设置</h2>
+          <button onClick={onClose} aria-label="关闭" className="p-2 -mr-2 rounded-full text-ink-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+            <X className="w-5 h-5" />
           </button>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {/* Basic Settings */}
+
+        <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-5">
+          <Field label="就寝目标时间" hint="用于计算睡前残留与截止时间">
+            <input type="time" className="input" value={form.bedtime} onChange={e => set('bedtime', e.target.value)} />
+          </Field>
+
+          <Field label="咖啡因半衰期" hint="3h 代谢快 / 4.5h 平均 / 6h 敏感">
+            <select className="input" value={form.halfLifeHours} onChange={e => set('halfLifeHours', Number(e.target.value))}>
+              <option value={3}>3 小时</option>
+              <option value={4.5}>4.5 小时</option>
+              <option value={6}>6 小时</option>
+            </select>
+          </Field>
+
+          <Field label="睡前残留阈值" hint="低于此值视为低风险">
+            <select className="input" value={form.sleepResidualThresholdMg} onChange={e => set('sleepResidualThresholdMg', Number(e.target.value))}>
+              <option value={20}>20 mg（严格）</option>
+              <option value={30}>30 mg（推荐）</option>
+              <option value={50}>50 mg（宽松）</option>
+            </select>
+          </Field>
+
           <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">基本设置</h3>
-            <div className="space-y-4">
+            <p className="text-[12px] text-ink-400 mb-2">每日目标</p>
+            <div className="grid grid-cols-3 gap-2.5">
               <div>
-                <label className="block text-sm font-medium mb-2">就寝目标时间</label>
-                <input
-                  type="time"
-                  value={localSettings.bedtime}
-                  onChange={(e) => setLocalSettings({ ...localSettings, bedtime: e.target.value })}
-                  className="input"
-                />
-                <p className="text-xs text-gray-500 mt-1">用于计算睡前咖啡因残留和截止时间</p>
+                <input type="number" min="50" step="10" className="input px-3 py-2.5 text-[13px]" value={form.dailyCaffeineTargetMg} onChange={e => set('dailyCaffeineTargetMg', Number(e.target.value))} />
+                <p className="mt-1 text-[10.5px] text-ink-400">咖啡因 mg</p>
               </div>
-              
               <div>
-                <label className="block text-sm font-medium mb-2">咖啡因半衰期</label>
-                <select
-                  value={localSettings.halfLifeHours}
-                  onChange={(e) => setLocalSettings({ ...localSettings, halfLifeHours: Number(e.target.value) })}
-                  className="input"
-                >
-                  <option value={3}>3 小时 - 代谢快，下午喝不影响睡眠</option>
-                  <option value={4.5}>4.5 小时 - 一般人群平均值</option>
-                  <option value={6}>6 小时 - 代谢慢，敏感人群</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">咖啡因在体内减少一半所需时间，因人而异</p>
+                <input type="number" min="5" step="1" className="input px-3 py-2.5 text-[13px]" value={form.dailySugarTargetG} onChange={e => set('dailySugarTargetG', Number(e.target.value))} />
+                <p className="mt-1 text-[10.5px] text-ink-400">添加糖 g</p>
               </div>
-              
               <div>
-                <label className="block text-sm font-medium mb-2">睡前残留阈值</label>
-                <select
-                  value={localSettings.sleepResidualThresholdMg}
-                  onChange={(e) => setLocalSettings({ ...localSettings, sleepResidualThresholdMg: Number(e.target.value) })}
-                  className="input"
-                >
-                  <option value={20}>20 mg - 严格</option>
-                  <option value={30}>30 mg - 推荐</option>
-                  <option value={50}>50 mg - 宽松</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">睡前体内咖啡因低于此值视为低风险</p>
+                <input type="number" min="500" step="50" className="input px-3 py-2.5 text-[13px]" value={form.dailyCalorieTargetKcal} onChange={e => set('dailyCalorieTargetKcal', Number(e.target.value))} />
+                <p className="mt-1 text-[10.5px] text-ink-400">热量 kcal</p>
               </div>
             </div>
+            <p className="mt-2 text-[11px] text-ink-400">参考：WHO 建议添加糖 &lt; 25g/天，咖啡因 &lt; 400mg/天</p>
           </div>
-          
-          {/* Daily Targets */}
-          <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">每日目标</h3>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm font-medium mb-2">咖啡因目标</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="50"
-                    max="1000"
-                    step="10"
-                    value={localSettings.dailyCaffeineTargetMg}
-                    onChange={(e) => setLocalSettings({ ...localSettings, dailyCaffeineTargetMg: Number(e.target.value) })}
-                    className="input"
-                  />
-                  <span className="text-gray-500">mg</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">添加糖目标</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="10"
-                    max="100"
-                    step="1"
-                    value={localSettings.dailySugarTargetG}
-                    onChange={(e) => setLocalSettings({ ...localSettings, dailySugarTargetG: Number(e.target.value) })}
-                    className="input"
-                  />
-                  <span className="text-gray-500">g</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">热量目标</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1000"
-                    max="5000"
-                    step="50"
-                    value={localSettings.dailyCalorieTargetKcal}
-                    onChange={(e) => setLocalSettings({ ...localSettings, dailyCalorieTargetKcal: Number(e.target.value) })}
-                    className="input"
-                  />
-                  <span className="text-gray-500">kcal</span>
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">参考：WHO 建议添加糖 &lt; 25g/天，咖啡因 &lt; 400mg/天</p>
+
+          <div className="space-y-2">
+            <button onClick={doExport} className="btn-secondary w-full justify-start">导出数据（JSON）</button>
+            <button onClick={() => setImportOpen(true)} className="btn-secondary w-full justify-start">导入数据（JSON）</button>
           </div>
-          
-          {/* Data Management */}
-          <div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">数据管理</h3>
-            <div className="space-y-3">
-              <button
-                onClick={handleExport}
-                className="btn-secondary w-full justify-start gap-3"
-              >
-                <Download className="w-5 h-5" />
-                <span>导出数据 (JSON)</span>
-              </button>
-              <button
-                onClick={() => setShowImportDialog(true)}
-                className="btn-secondary w-full justify-start gap-3"
-              >
-                <Upload className="w-5 h-5" />
-                <span>导入数据 (JSON)</span>
-              </button>
-              <button
-                onClick={() => setShowClearConfirm(true)}
-                className="btn-secondary w-full justify-start gap-3 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900"
-              >
-                <Trash2 className="w-5 h-5" />
-                <span>清空所有数据</span>
-              </button>
-            </div>
-          </div>
-          
-          {/* Disclaimer */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">免责声明</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 space-y-2">
-              本工具仅供个人参考，提供的咖啡因残留估算基于一阶消除动力学模型，<br />
-              实际代谢因人而异，受遗传、年龄、体重、药物、肝功能等多种因素影响。<br />
-              <span className="font-medium">不构成医疗建议，请勿用于健康决策。</span><br />
-              品牌库数据来源于公开信息汇总，仅为估算值，实际含量可能有差异。
-            </p>
-          </div>
-          
-          {/* Save Button */}
-          <button
-            onClick={handleSave}
-            className="btn-primary w-full py-3 mt-4"
-          >
-            保存设置
-          </button>
+
+          <button onClick={save} className="btn-primary w-full">保存设置</button>
         </div>
-        
-        {/* Export Dialog */}
-        {showExportDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md animate-slide-up">
-              <h3 className="text-lg font-semibold mb-4">导出数据</h3>
-              <textarea
-                value={exportJson}
-                readOnly
-                className="input h-40 font-mono text-xs"
-              />
-              <div className="flex gap-3 mt-4">
-                <button onClick={copyExport} className="btn-secondary flex-1">复制</button>
-                <button onClick={downloadExport} className="btn-primary flex-1">下载文件</button>
+
+        {exportText !== null && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
+            <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-[2px]" onClick={() => setExportText(null)} />
+            <div className="relative w-full max-w-sm rounded-3xl bg-white p-5 dark:bg-slate-900 animate-slide-up">
+              <h3 className="text-[15px] font-semibold mb-1">导出备份</h3>
+              <p className="text-[12px] text-ink-400 mb-3">保存到手机，换设备时用「导入数据」恢复。</p>
+              <div className="flex gap-2.5">
+                <button onClick={download} className="btn-primary flex-1">下载文件</button>
+                <button onClick={() => setExportText(null)} className="btn-ghost flex-1">取消</button>
               </div>
-              <button onClick={() => setShowExportDialog(false)} className="btn-ghost w-full mt-3">关闭</button>
             </div>
           </div>
         )}
-        
-        {/* Import Dialog */}
-        {showImportDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md animate-slide-up">
-              <h3 className="text-lg font-semibold mb-4">导入数据</h3>
-              <p className="text-sm text-gray-500 mb-3">粘贴之前导出的 JSON 数据（将覆盖现有数据）</p>
+
+        {importOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
+            <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-[2px]" onClick={() => setImportOpen(false)} />
+            <div className="relative w-full max-w-sm rounded-3xl bg-white p-5 dark:bg-slate-900 animate-slide-up">
+              <h3 className="text-[15px] font-semibold mb-1">导入数据</h3>
+              <p className="text-[12px] text-ink-400 mb-3">粘贴之前导出的 JSON（会覆盖现有数据）</p>
               <textarea
-                value={importJson}
-                onChange={(e) => setImportJson(e.target.value)}
+                value={importText}
+                onChange={e => setImportText(e.target.value)}
                 placeholder='{"templates":[],"logs":[],"settings":{...}}'
-                className="input h-40 font-mono text-xs"
+                className="input h-32 font-mono text-[11px]"
               />
-              <div className="flex gap-3 mt-4">
-                <button onClick={handleImport} className="btn-primary flex-1">导入</button>
-                <button onClick={() => setShowImportDialog(false)} className="btn-ghost flex-1">取消</button>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Clear Confirm Dialog */}
-        {showClearConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md animate-slide-up">
-              <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-center mb-2">确定要清空所有数据吗？</h3>
-              <p className="text-sm text-gray-500 text-center mb-6">此操作将删除所有饮品记录、自定义饮品和设置，无法恢复。</p>
-              <div className="flex gap-3">
-                <button onClick={handleClear} className="btn-danger flex-1">清空</button>
-                <button onClick={() => setShowClearConfirm(false)} className="btn-ghost flex-1">取消</button>
+              <div className="mt-3 flex gap-2.5">
+                <button onClick={doImport} className="btn-primary flex-1">导入</button>
+                <button onClick={() => setImportOpen(false)} className="btn-ghost flex-1">取消</button>
               </div>
             </div>
           </div>

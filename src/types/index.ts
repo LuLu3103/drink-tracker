@@ -2,6 +2,33 @@ export type DrinkCategory = 'coffee' | 'milk_tea' | 'tea' | 'other'
 
 export type BaseType = 'espresso' | 'tea_base' | 'matcha' | 'cocoa' | 'none'
 
+/** 插画风格：决定杯里液体的样子 */
+export type ArtStyle =
+  | 'americano'
+  | 'latte'
+  | 'milk_tea'
+  | 'fruit_tea'
+  | 'matcha'
+  | 'cocoa'
+  | 'tea'
+  | 'soda'
+  | 'smoothie'
+  | 'juice'
+
+/** 杯型 */
+export type CupType = 'cold' | 'hot'
+
+export type Topping = 'none' | 'pearl' | 'fruit' | 'cream' | 'ice' | 'bubbles'
+
+export interface DrinkArt {
+  style: ArtStyle
+  cup: CupType
+  /** 杯中配料，决定插画细节 */
+  topping?: Topping
+  /** 自定义主色，覆盖风格默认色 */
+  tint?: string
+}
+
 export interface DrinkTemplate {
   id: string
   brand: string
@@ -14,6 +41,7 @@ export interface DrinkTemplate {
   caffeineMax?: number
   sugarG: number
   caloriesKcal: number
+  art: DrinkArt
   source?: string
   isCustom: boolean
   isFavorite?: boolean
@@ -31,6 +59,7 @@ export interface DrinkLog {
   caffeineMg: number
   sugarG: number
   caloriesKcal: number
+  art?: DrinkArt
   consumedAt: number
   createdAt: number
 }
