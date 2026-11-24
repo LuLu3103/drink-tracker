@@ -101,7 +101,7 @@ function calculateCutoffTime(
     cutoffTime: cutoffTimeStr,
     isPast,
     message: isPast
-      ? `已过今日咖啡因截止时间（约 ${cutoffTimeStr}）`
+      ? `已过咖啡因截止时间（${cutoffTimeStr}）· 现在再喝会影响睡眠`
       : `今天的咖啡因截止时间约 ${cutoffTimeStr}`
   }
 }
