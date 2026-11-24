@@ -32,9 +32,12 @@ export default function RecordPage({ onQuickRecord, onOpenPicker, onOpenCustomDr
     const recent = recentIds
       .map(id => visible.find(t => t.id === id))
       .filter((t): t is DrinkTemplate => Boolean(t))
-    if (recent.length >= 4) return recent.slice(0, 6)
     const favs = visible.filter(t => t.isFavorite && !recentIds.includes(t.id))
-    return [...recent, ...favs].slice(0, 6)
+    const picked = [...recent, ...favs]
+    const pickedIds = new Set(picked.map(t => t.id))
+    // 不足 6 个时用库中其余饮品补齐，保证首页固定展示 6 个入口
+    const filler = visible.filter(t => !pickedIds.has(t.id))
+    return [...picked, ...filler].slice(0, 6)
   }, [templates, logs])
 
   const pct = (v: number, target: number) => Math.min(100, Math.round((v / target) * 100))

@@ -46,6 +46,7 @@ interface DrinkState {
   hideToast: (id: string) => void
   backup: { createdAt: number; size: number } | null
   hideTemplate: (id: string) => Promise<void>
+  saveTemplateEdit: (id: string, patch: Partial<DrinkTemplate>) => Promise<void>
   unhideTemplate: (id: string) => Promise<void>
   createBackup: () => Promise<void>
   restoreLatestBackup: () => Promise<void>
@@ -421,6 +422,14 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
         set(state => ({
           templates: state.templates.map(t => (t.id === id ? { ...t, isHidden: true } : t)),
         }))
+      },
+
+      saveTemplateEdit: async (id, patch) => {
+        const existing = get().templates.find(t => t.id === id)
+        if (!existing) return
+        const next: DrinkTemplate = { ...existing, ...patch, isEdited: true }
+        await db.templates.put(next)
+        set(state => ({ templates: state.templates.map(t => (t.id === id ? next : t)) }))
       },
 
       unhideTemplate: async (id) => {

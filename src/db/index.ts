@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie'
-import type { DrinkTemplate, DrinkLog, Settings, DrinkCategory, BaseType, ArtStyle, CupType, Topping } from '@/types'
+import type { DrinkTemplate, DrinkLog, Settings, DrinkCategory, BaseType, ArtStyle, CupType, Topping, SizeVariant } from '@/types'
 
 export class DrinkTrackerDB extends Dexie {
   templates!: Table<DrinkTemplate>
@@ -48,6 +48,62 @@ function toppingFor(name: string, style: ArtStyle): Topping {
   return 'none'
 }
 
+/** 常见饮品的可选杯型（中杯 / 大杯） */
+const SIZE_PRESETS: Record<string, SizeVariant[]> = {
+  'luckin-shengye': [
+    { label: '中杯', caffeineMg: 120, sugarG: 12, caloriesKcal: 185 },
+    { label: '大杯', caffeineMg: 150, sugarG: 15, caloriesKcal: 230 },
+  ],
+  'luckin-americano': [
+    { label: '中杯', caffeineMg: 150, sugarG: 0, caloriesKcal: 10 },
+    { label: '大杯', caffeineMg: 180, sugarG: 0, caloriesKcal: 12 },
+  ],
+  'cotti-americano': [
+    { label: '中杯', caffeineMg: 160, sugarG: 0, caloriesKcal: 8 },
+    { label: '大杯', caffeineMg: 190, sugarG: 0, caloriesKcal: 10 },
+  ],
+  'sbux-latte': [
+    { label: '中杯', caffeineMg: 150, sugarG: 10, caloriesKcal: 210 },
+    { label: '大杯', caffeineMg: 195, sugarG: 13, caloriesKcal: 270 },
+  ],
+  'chagee-boya': [
+    { label: '中杯', caffeineMg: 120, sugarG: 22, caloriesKcal: 235 },
+    { label: '大杯', caffeineMg: 155, sugarG: 29, caloriesKcal: 300 },
+  ],
+  'chayan-youlan': [
+    { label: '中杯', caffeineMg: 60, sugarG: 26, caloriesKcal: 250 },
+    { label: '大杯', caffeineMg: 78, sugarG: 33, caloriesKcal: 320 },
+  ],
+  'heytea-grape': [
+    { label: '中杯', caffeineMg: 30, sugarG: 28, caloriesKcal: 250 },
+    { label: '大杯', caffeineMg: 38, sugarG: 35, caloriesKcal: 315 },
+  ],
+  'guming-taro': [
+    { label: '中杯', caffeineMg: 40, sugarG: 34, caloriesKcal: 330 },
+    { label: '大杯', caffeineMg: 52, sugarG: 43, caloriesKcal: 420 },
+  ],
+  'cbd-mango': [
+    { label: '中杯', caffeineMg: 20, sugarG: 34, caloriesKcal: 295 },
+    { label: '大杯', caffeineMg: 26, sugarG: 43, caloriesKcal: 375 },
+  ],
+  'coco-pearl': [
+    { label: '中杯', caffeineMg: 45, sugarG: 38, caloriesKcal: 300 },
+    { label: '大杯', caffeineMg: 58, sugarG: 48, caloriesKcal: 385 },
+  ],
+  'yidiandian-boba': [
+    { label: '中杯', caffeineMg: 42, sugarG: 36, caloriesKcal: 295 },
+    { label: '大杯', caffeineMg: 54, sugarG: 45, caloriesKcal: 375 },
+  ],
+  'mixue-pearl': [
+    { label: '中杯', caffeineMg: 30, sugarG: 26, caloriesKcal: 210 },
+    { label: '大杯', caffeineMg: 40, sugarG: 35, caloriesKcal: 280 },
+  ],
+  'mixue-lemon': [
+    { label: '中杯', caffeineMg: 0, sugarG: 18, caloriesKcal: 72 },
+    { label: '大杯', caffeineMg: 0, sugarG: 25, caloriesKcal: 100 },
+  ],
+}
+
 export const BRAND_ORDER = [
   '瑞幸', '库迪', '星巴克', 'Manner', 'M Stand', 'Tims天好', "Peet's",
   '霸王茶姬', '茶颜悦色', '喜茶', '奈雪的茶', '古茗', '茶百道', '沪上阿姨',
@@ -91,7 +147,7 @@ function T(
   }
 }
 
-export const BUILTIN_TEMPLATES: Array<Omit<DrinkTemplate, 'createdAt'>> = [
+const BASE_TEMPLATES: Array<Omit<DrinkTemplate, 'createdAt'>> = [
   // 瑞幸
   T('luckin-shengye', '瑞幸', '生椰拿铁', 'coffee', 'espresso', '标准', 150, 120, 180, 15, 230, 'latte', 'cold', '#E3C6A3', true),
   T('luckin-houru', '瑞幸', '厚乳拿铁', 'coffee', 'espresso', '标准', 140, 110, 170, 18, 262, 'latte', 'cold', '#D9B48D'),
@@ -202,6 +258,10 @@ export const BUILTIN_TEMPLATES: Array<Omit<DrinkTemplate, 'createdAt'>> = [
   T('diy-milktea', '自制', '红茶奶茶', 'milk_tea', 'tea_base', '一杯', 45, 35, 55, 18, 180, 'milk_tea', 'hot', '#C19571'),
 ]
 
+export const BUILTIN_TEMPLATES: Array<Omit<DrinkTemplate, 'createdAt'>> = BASE_TEMPLATES.map(t =>
+  SIZE_PRESETS[t.id] ? { ...t, sizes: SIZE_PRESETS[t.id] } : t,
+)
+
 export async function initDB(): Promise<void> {
   const settingsCount = await db.settings.count()
   if (settingsCount === 0) {
@@ -216,9 +276,11 @@ export async function initDB(): Promise<void> {
       const existing = await db.templates.get(tpl.id)
       if (!existing) {
         await db.templates.add({ ...tpl, createdAt: now })
-      } else if (!existing.isCustom) {
+      } else if (!existing.isCustom && !existing.isEdited) {
+        // 用户编辑过的内置饮品保持原样，不被种子数据覆盖
         await db.templates.put({
           ...tpl,
+          sizes: existing.sizes ?? tpl.sizes,
           isFavorite: existing.isFavorite ?? tpl.isFavorite,
           isHidden: existing.isHidden ?? false,
           createdAt: existing.createdAt,

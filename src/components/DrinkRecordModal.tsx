@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { DrinkTemplate, DrinkCategory } from '@/types'
+import type { DrinkTemplate } from '@/types'
 import { useDrinkStore } from '@/store'
+import { BRAND_ORDER } from '@/db'
 import { DrinkArtwork } from '@/components/DrinkArtwork'
-import { X, Search, Plus, Minus, Loader2, Check } from 'lucide-react'
+import { X, Search, Plus, Minus, Loader2, Check, ChevronDown } from 'lucide-react'
 
 interface Props {
   isOpen: boolean
@@ -11,13 +12,7 @@ interface Props {
   initialTime?: number
 }
 
-const TABS: Array<{ key: 'all' | DrinkCategory; label: string }> = [
-  { key: 'all', label: '全部' },
-  { key: 'coffee', label: '咖啡' },
-  { key: 'milk_tea', label: '奶茶' },
-  { key: 'tea', label: '纯茶' },
-  { key: 'other', label: '其他' },
-]
+const COLLAPSED_COUNT = 8
 
 function toLocalInput(ts: number): string {
   const d = new Date(ts)
@@ -34,8 +29,10 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
   const showToast = useDrinkStore(s => s.showToast)
 
   const [query, setQuery] = useState('')
-  const [tab, setTab] = useState<'all' | DrinkCategory>('all')
+  const [brand, setBrand] = useState<string>('all')
+  const [expanded, setExpanded] = useState(false)
   const [picked, setPicked] = useState<DrinkTemplate | null>(template ?? null)
+  const [variantIndex, setVariantIndex] = useState(0)
   const [amount, setAmount] = useState(1)
   const [consumedAt, setConsumedAt] = useState(initialTime ?? Date.now())
   const [saving, setSaving] = useState(false)
@@ -43,25 +40,55 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
   useEffect(() => {
     if (!isOpen) return
     setPicked(template ?? null)
+    setVariantIndex(0)
     setAmount(1)
     setConsumedAt(initialTime ?? Date.now())
     setQuery('')
-    setTab('all')
+    setExpanded(false)
   }, [isOpen, template, initialTime])
+
+  const brands = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const t of templates) {
+      if (t.isHidden) continue
+      map.set(t.brand, (map.get(t.brand) || 0) + 1)
+    }
+    return Array.from(map.entries()).sort((a, b) => {
+      const ra = BRAND_ORDER.indexOf(a[0])
+      const rb = BRAND_ORDER.indexOf(b[0])
+      return (ra === -1 ? 999 : ra) - (rb === -1 ? 999 : rb)
+    })
+  }, [templates])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return templates.filter(t => {
       if (t.isHidden) return false
-      if (tab !== 'all' && t.category !== tab) return false
+      if (brand !== 'all' && t.brand !== brand) return false
       if (!q) return true
       return (t.brand + t.name).toLowerCase().includes(q)
     })
-  }, [templates, query, tab])
+  }, [templates, brand, query])
 
-  const previewCaffeine = picked ? picked.caffeineMg * amount : 0
+  const collapsed = brand === 'all' && !expanded
+  const shown = collapsed ? filtered.slice(0, COLLAPSED_COUNT) : filtered
+
+  const variants = useMemo(() => {
+    if (!picked) return []
+    if (picked.sizes && picked.sizes.length > 0) return picked.sizes
+    return [{
+      label: picked.size,
+      caffeineMg: picked.caffeineMg,
+      sugarG: picked.sugarG,
+      caloriesKcal: picked.caloriesKcal,
+    }]
+  }, [picked])
+
+  const variant = variants[Math.min(variantIndex, Math.max(0, variants.length - 1))]
+
+  const previewCaffeine = variant ? variant.caffeineMg * amount : 0
   const estimatedBed = useMemo(() => {
-    if (!picked) return bedtimeResidual
+    if (!picked || !variant) return bedtimeResidual
     const [h, m] = settings.bedtime.split(':').map(Number)
     const bed = new Date()
     bed.setHours(h, m, 0, 0)
@@ -69,7 +96,7 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
     const hours = (bed.getTime() - consumedAt) / 3600000
     const decay = hours > 0 ? Math.pow(0.5, hours / settings.halfLifeHours) : 1
     return bedtimeResidual + previewCaffeine * decay
-  }, [picked, consumedAt, bedtimeResidual, previewCaffeine, settings.bedtime, settings.halfLifeHours])
+  }, [picked, variant, consumedAt, bedtimeResidual, previewCaffeine, settings.bedtime, settings.halfLifeHours])
 
   const threshold = settings.sleepResidualThresholdMg
   const level = estimatedBed < threshold ? 'low' : estimatedBed < threshold * 2 ? 'medium' : 'high'
@@ -77,7 +104,7 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
   const levelText = level === 'low' ? '低风险' : level === 'medium' ? '中等风险' : '较高风险'
 
   const handleRecord = async () => {
-    if (!picked) return
+    if (!picked || !variant) return
     setSaving(true)
     try {
       await addLog({
@@ -86,10 +113,10 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
         name: picked.name,
         category: picked.category,
         baseType: picked.baseType,
-        size: picked.size,
-        caffeineMg: Math.round(picked.caffeineMg * amount),
-        sugarG: Math.round(picked.sugarG * amount * 10) / 10,
-        caloriesKcal: Math.round(picked.caloriesKcal * amount),
+        size: variant.label,
+        caffeineMg: Math.round(variant.caffeineMg * amount),
+        sugarG: Math.round(variant.sugarG * amount * 10) / 10,
+        caloriesKcal: Math.round(variant.caloriesKcal * amount),
         art: picked.art,
         consumedAt,
       })
@@ -116,7 +143,7 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 pb-6 space-y-3.5">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
             <input
@@ -128,30 +155,39 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
             />
           </div>
 
-          <div className="scrollbar-hide -mx-1 flex gap-2 overflow-x-auto px-1">
-            {TABS.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={tab === t.key ? 'chip-active' : 'chip-idle'}
-              >
-                {t.label}
-              </button>
-            ))}
+          <div className="relative">
+            <select
+              value={brand}
+              onChange={e => {
+                setBrand(e.target.value)
+                setExpanded(false)
+              }}
+              aria-label="按品牌筛选"
+              className="input appearance-none bg-slate-50 pr-10 dark:bg-slate-900"
+            >
+              <option value="all">全部品牌（{brands.reduce((s, b) => s + b[1], 0)}）</option>
+              {brands.map(([b, n]) => (
+                <option key={b} value={b}>{b}（{n}）</option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           </div>
 
-          <div className={'gap-2 ' + (picked ? 'grid grid-cols-1' : 'grid grid-cols-1')}>
-            {filtered.length === 0 && (
-              <p className="py-10 text-center text-[13px] text-ink-400">没有找到，试试其他关键词</p>
+          <div className="space-y-2">
+            {shown.length === 0 && (
+              <p className="py-10 text-center text-[13px] text-ink-400">没有找到，换个关键词试试</p>
             )}
-            {filtered.map(t => {
+            {shown.map(t => {
               const active = picked?.id === t.id
               return (
                 <button
                   key={t.id}
-                  onClick={() => setPicked(t)}
+                  onClick={() => {
+                    setPicked(t)
+                    setVariantIndex(0)
+                  }}
                   className={
-                    'flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors ' +
+                    'flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors ' +
                     (active
                       ? 'border-brand-300 bg-brand-50 dark:border-brand-700 dark:bg-brand-900/20'
                       : 'border-transparent bg-slate-50 dark:bg-slate-900')
@@ -159,34 +195,60 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
                 >
                   <DrinkArtwork art={t.art} size={38} className="shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-medium truncate">{t.name}</p>
-                    <p className="text-[11.5px] text-ink-400 truncate">
-                      {t.brand} · {t.size} · {t.caffeineMg}mg
+                    <p className="truncate text-[14px] font-medium">{t.name}</p>
+                    <p className="truncate text-[11.5px] text-ink-400">
+                      {t.brand} · {t.sizes && t.sizes.length > 1 ? t.sizes.map(s => s.label).join('/') : t.size} · {t.caffeineMg}mg
                     </p>
                   </div>
                   {active && <Check className="w-4 h-4 text-brand-600 shrink-0" />}
                 </button>
               )
             })}
+
+            {brand === 'all' && filtered.length > COLLAPSED_COUNT && (
+              <button
+                onClick={() => setExpanded(v => !v)}
+                className="w-full rounded-2xl border border-dashed border-slate-200 py-2.5 text-[12.5px] font-medium text-ink-500 dark:border-slate-700 dark:text-slate-400"
+              >
+                {expanded ? '收起' : '展开全部 ' + filtered.length + ' 个'}
+              </button>
+            )}
           </div>
 
-          {picked && (
-            <div className="rounded-3xl border border-brand-100 bg-brand-50/60 p-4 space-y-4 dark:border-brand-900/40 dark:bg-brand-900/10">
+          {picked && variant && (
+            <div className="space-y-4 rounded-3xl border border-brand-100 bg-brand-50/60 p-4 dark:border-brand-900/40 dark:bg-brand-900/10">
               <div className="flex items-center gap-3">
                 <DrinkArtwork art={picked.art} size={52} className="shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold truncate">{picked.name}</p>
-                  <p className="text-[12px] text-ink-400">{picked.brand} · {picked.size}</p>
+                  <p className="truncate text-[15px] font-semibold">{picked.name}</p>
+                  <p className="text-[12px] text-ink-400">{picked.brand} · {variant.label}</p>
                 </div>
                 <span className="text-[12px] font-medium text-brand-600">×{amount}</span>
               </div>
+
+              {variants.length > 1 && (
+                <div>
+                  <p className="mb-1.5 text-[12px] text-ink-400">杯型</p>
+                  <div className="flex gap-2">
+                    {variants.map((v, i) => (
+                      <button
+                        key={v.label + i}
+                        onClick={() => setVariantIndex(i)}
+                        className={i === variantIndex ? 'chip-active' : 'chip-idle'}
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setAmount(Math.max(0.5, amount - 0.5))}
                   disabled={amount <= 0.5}
                   aria-label="减少份量"
-                  className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center disabled:opacity-40 dark:bg-slate-900 dark:border-slate-700"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
@@ -194,14 +256,14 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
                 <button
                   onClick={() => setAmount(amount + 0.5)}
                   aria-label="增加份量"
-                  className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center dark:bg-slate-900 dark:border-slate-700"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
 
               <div>
-                <label className="block text-[12px] text-ink-400 mb-1.5">饮用时间</label>
+                <label className="mb-1.5 block text-[12px] text-ink-400">饮用时间</label>
                 <input
                   type="datetime-local"
                   value={toLocalInput(consumedAt)}
@@ -217,11 +279,11 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
                   <p className="text-[10.5px] text-ink-400">mg 咖啡因</p>
                 </div>
                 <div className="rounded-2xl bg-white py-2.5 dark:bg-slate-900">
-                  <p className="text-[17px] font-semibold text-amber-500">{(picked.sugarG * amount).toFixed(1)}</p>
+                  <p className="text-[17px] font-semibold text-amber-500">{(variant.sugarG * amount).toFixed(1)}</p>
                   <p className="text-[10.5px] text-ink-400">g 糖</p>
                 </div>
                 <div className="rounded-2xl bg-white py-2.5 dark:bg-slate-900">
-                  <p className="text-[17px] font-semibold text-rose-500">{Math.round(picked.caloriesKcal * amount)}</p>
+                  <p className="text-[17px] font-semibold text-rose-500">{Math.round(variant.caloriesKcal * amount)}</p>
                   <p className="text-[10.5px] text-ink-400">kcal</p>
                 </div>
               </div>

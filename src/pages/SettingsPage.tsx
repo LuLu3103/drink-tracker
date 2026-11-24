@@ -126,7 +126,7 @@ export default function SettingsPage({
           </div>
           <div className="min-w-0">
             <p className="text-[15px] font-semibold">饮品日记</p>
-            <p className="text-[12px] text-ink-400 mt-0.5">v0.3 · 本地存储 · 无账号</p>
+            <p className="text-[12px] text-ink-400 mt-0.5">v1.0 · 本地存储 · 无账号</p>
           </div>
         </section>
 

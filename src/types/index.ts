@@ -29,6 +29,14 @@ export interface DrinkArt {
   tint?: string
 }
 
+/** 同一款饮品的可选杯型 */
+export interface SizeVariant {
+  label: string
+  caffeineMg: number
+  sugarG: number
+  caloriesKcal: number
+}
+
 export interface DrinkTemplate {
   id: string
   brand: string
@@ -47,6 +55,10 @@ export interface DrinkTemplate {
   isFavorite?: boolean
   /** 内置饮品被「从库中移除」时置为 true，不会再次被种子逻辑恢复 */
   isHidden?: boolean
+  /** 用户改过参数，种子逻辑不再覆盖 */
+  isEdited?: boolean
+  /** 可选杯型；为空则只有 size 一个规格 */
+  sizes?: SizeVariant[]
   createdAt: number
 }
 
