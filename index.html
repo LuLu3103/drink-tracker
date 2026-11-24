@@ -12,6 +12,22 @@
     <meta name="apple-mobile-web-app-title" content="饮品记账" />
 
     <title>饮品记账本</title>
+    <script>
+      // 非安全上下文（局域网 HTTP 访问）下 crypto.randomUUID 不存在，这里补一个等价实现
+      (function () {
+        var c = window.crypto || window.msCrypto
+        if (c && typeof c.randomUUID !== 'function' && typeof c.getRandomValues === 'function') {
+          c.randomUUID = function () {
+            var b = c.getRandomValues(new Uint8Array(16))
+            b[6] = (b[6] & 15) | 64
+            b[8] = (b[8] & 63) | 128
+            var h = ''
+            for (var i = 0; i < 16; i++) h += (b[i] + 256).toString(16).slice(1)
+            return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20)
+          }
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

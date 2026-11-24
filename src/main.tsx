@@ -15,3 +15,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>
 )
+
+// Service Worker only works in a secure context (HTTPS or localhost).
+// Over plain HTTP on a LAN IP the app still runs, just without offline cache.
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  import('virtual:pwa-register')
+    .then(({ registerSW }) => registerSW({ immediate: true }))
+    .catch(() => {
+      /* offline cache unavailable, ignore */
+    })
+}

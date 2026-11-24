@@ -1,5 +1,6 @@
 import Dexie, { Table } from 'dexie'
 import type { DrinkTemplate, DrinkLog, Settings } from '@/types'
+import { newId } from '@/utils/id'
 
 export class DrinkTrackerDB extends Dexie {
   templates!: Table<DrinkTemplate>
@@ -387,7 +388,7 @@ export async function initDB() {
     for (const template of INITIAL_TEMPLATES) {
       await db.templates.add({
         ...template,
-        id: crypto.randomUUID(),
+        id: newId(),
         createdAt: now
       })
     }

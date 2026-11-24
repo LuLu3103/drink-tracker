@@ -4,6 +4,7 @@ const path = require('path')
 
 const ROOT = path.resolve(__dirname, '..', 'dist')
 const PORT = Number(process.env.PORT || 4173)
+const HOST = process.env.HOST || '0.0.0.0'
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -16,6 +17,7 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.map': 'application/json',
+  '.txt': 'text/plain; charset=utf-8',
 }
 
 http
@@ -27,8 +29,8 @@ http
       filePath = path.join(ROOT, 'index.html')
     }
 
-    if (!filePath.startsWith(ROOT)) {
-      res.writeHead(403).end('forbidden')
+    if (!path.resolve(filePath).startsWith(ROOT)) {
+      res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' }).end('forbidden')
       return
     }
 
@@ -39,11 +41,13 @@ http
       }
       res.writeHead(200, {
         'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
-        'Cache-Control': urlPath.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+        'Cache-Control': urlPath.includes('/assets/')
+          ? 'public, max-age=31536000, immutable'
+          : 'no-cache',
       })
       res.end(data)
     })
   })
-  .listen(PORT, '127.0.0.1', () => {
-    console.log('preview listening on http://127.0.0.1:' + PORT)
+  .listen(PORT, HOST, () => {
+    console.log('preview listening on http://' + HOST + ':' + PORT)
   })

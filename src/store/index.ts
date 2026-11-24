@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { DrinkTemplate, DrinkLog, Settings, CaffeinePoint, DailyStats, RiskLevel, CutoffInfo } from '@/types'
 import { db, initDB, DEFAULT_SETTINGS } from '@/db'
+import { newId } from '@/utils/id'
 
 export type ToastType = 'success' | 'error' | 'info'
 
@@ -238,7 +239,7 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
       addTemplate: async (template) => {
         const newTemplate: DrinkTemplate = {
           ...template,
-          id: crypto.randomUUID(),
+          id: newId(),
           createdAt: Date.now()
         }
         await db.templates.add(newTemplate)
@@ -272,7 +273,7 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
       addLog: async (log) => {
         const newLog: DrinkLog = {
           ...log,
-          id: crypto.randomUUID(),
+          id: newId(),
           createdAt: Date.now()
         }
         await db.logs.add(newLog)
