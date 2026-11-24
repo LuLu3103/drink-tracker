@@ -8,6 +8,7 @@ import SettingsPage from '@/pages/SettingsPage'
 import { DrinkRecordModal } from '@/components/DrinkRecordModal'
 import { CustomDrinkModal } from '@/components/CustomDrinkModal'
 import { SettingsModal } from '@/components/SettingsModal'
+import LibraryPage from '@/pages/LibraryPage'
 import { ToastContainer } from '@/components/Toast'
 import { Plus, CalendarDays, ChartColumn, Settings2 } from 'lucide-react'
 
@@ -27,6 +28,7 @@ export default function App() {
   const [selected, setSelected] = useState<DrinkTemplate | null>(null)
   const [customOpen, setCustomOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [libraryOpen, setLibraryOpen] = useState(false)
 
   useEffect(() => {
     void loadAll()
@@ -55,7 +57,9 @@ export default function App() {
         )}
         {tab === 'timeline' && <TimelinePage />}
         {tab === 'stats' && <StatsPage />}
-        {tab === 'settings' && <SettingsPage onOpenSettings={() => setSettingsOpen(true)} />}
+        {tab === 'settings' && (
+          <SettingsPage onOpenSettings={() => setSettingsOpen(true)} onOpenLibrary={() => setLibraryOpen(true)} />
+        )}
       </main>
 
       <nav className="tab-bar safe-bottom" role="tablist" aria-label="主导航">
@@ -78,6 +82,10 @@ export default function App() {
           })}
         </div>
       </nav>
+
+      {libraryOpen && (
+        <LibraryPage onClose={() => setLibraryOpen(false)} onAdd={() => setCustomOpen(true)} />
+      )}
 
       <DrinkRecordModal isOpen={recordOpen} onClose={() => setRecordOpen(false)} template={selected} />
       <CustomDrinkModal isOpen={customOpen} onClose={() => setCustomOpen(false)} />

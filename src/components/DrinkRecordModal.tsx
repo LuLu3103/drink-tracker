@@ -52,6 +52,7 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return templates.filter(t => {
+      if (t.isHidden) return false
       if (tab !== 'all' && t.category !== tab) return false
       if (!q) return true
       return (t.brand + t.name).toLowerCase().includes(q)

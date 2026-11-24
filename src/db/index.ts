@@ -5,6 +5,7 @@ export class DrinkTrackerDB extends Dexie {
   templates!: Table<DrinkTemplate>
   logs!: Table<DrinkLog>
   settings!: Table<Settings>
+  backups!: Table<import('@/types').BackupRecord>
 
   constructor() {
     super('DrinkTrackerDB')
@@ -12,6 +13,12 @@ export class DrinkTrackerDB extends Dexie {
       templates: '++id, brand, name, category, isCustom, isFavorite, createdAt',
       logs: '++id, templateId, consumedAt, createdAt',
       settings: '++id',
+    })
+    this.version(2).stores({
+      templates: '++id, brand, name, category, isCustom, isFavorite, isHidden, createdAt',
+      logs: '++id, templateId, consumedAt, createdAt',
+      settings: '++id',
+      backups: '++id, createdAt',
     })
   }
 }
@@ -25,6 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dailyCaffeineTargetMg: 300,
   dailySugarTargetG: 25,
   dailyCalorieTargetKcal: 2000,
+  autoBackupWeekly: false,
 }
 
 const SOURCE = '品牌公开信息 / 常见检测汇总，估算值'
@@ -212,6 +220,7 @@ export async function initDB(): Promise<void> {
         await db.templates.put({
           ...tpl,
           isFavorite: existing.isFavorite ?? tpl.isFavorite,
+          isHidden: existing.isHidden ?? false,
           createdAt: existing.createdAt,
         })
       }

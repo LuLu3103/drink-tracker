@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { useDrinkStore } from '@/store'
 import type { DrinkTemplate } from '@/types'
 import { DrinkArtwork } from '@/components/DrinkArtwork'
+import { DrinkCalendar } from '@/components/DrinkCalendar'
+import { Logo } from '@/components/Logo'
 import { Plus, ChevronRight, Coffee, Moon } from 'lucide-react'
 
 interface RecordPageProps {
@@ -21,16 +23,17 @@ export default function RecordPage({ onQuickRecord, onOpenPicker, onOpenCustomDr
   const todayStats = useDrinkStore(s => s.todayStats)
 
   const shortcuts = useMemo(() => {
+    const visible = templates.filter(t => !t.isHidden)
     const recentIds: string[] = []
     for (const log of logs) {
       if (log.templateId && !recentIds.includes(log.templateId)) recentIds.push(log.templateId)
       if (recentIds.length >= 6) break
     }
     const recent = recentIds
-      .map(id => templates.find(t => t.id === id))
+      .map(id => visible.find(t => t.id === id))
       .filter((t): t is DrinkTemplate => Boolean(t))
     if (recent.length >= 4) return recent.slice(0, 6)
-    const favs = templates.filter(t => t.isFavorite && !recentIds.includes(t.id))
+    const favs = visible.filter(t => t.isFavorite && !recentIds.includes(t.id))
     return [...recent, ...favs].slice(0, 6)
   }, [templates, logs])
 
@@ -45,12 +48,17 @@ export default function RecordPage({ onQuickRecord, onOpenPicker, onOpenCustomDr
   return (
     <div className="h-full overflow-y-auto">
       <div className="px-5 pt-6 pb-32 space-y-5">
-        <header className="flex items-start justify-between">
-          <div>
-            <p className="text-[13px] text-ink-400 tracking-wide">
-              {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
-            </p>
-            <h1 className="mt-1 text-[26px] font-semibold tracking-tight">饮品记账</h1>
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Logo size={42} />
+            <div>
+              <p className="text-[16px] font-semibold tracking-tight leading-tight">
+                {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}
+              </p>
+              <p className="mt-0.5 text-[11.5px] text-ink-400">
+                {new Date().toLocaleDateString('zh-CN', { weekday: 'long' })}
+              </p>
+            </div>
           </div>
           <button
             onClick={onOpenPicker}
@@ -120,6 +128,8 @@ export default function RecordPage({ onQuickRecord, onOpenPicker, onOpenCustomDr
             ))}
           </div>
         </section>
+
+        <DrinkCalendar logs={logs} />
 
         <section>
           <div className="flex items-center justify-between mb-3">

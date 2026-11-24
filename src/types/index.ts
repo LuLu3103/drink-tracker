@@ -45,6 +45,8 @@ export interface DrinkTemplate {
   source?: string
   isCustom: boolean
   isFavorite?: boolean
+  /** 内置饮品被「从库中移除」时置为 true，不会再次被种子逻辑恢复 */
+  isHidden?: boolean
   createdAt: number
 }
 
@@ -71,6 +73,16 @@ export interface Settings {
   dailyCaffeineTargetMg: number
   dailySugarTargetG: number
   dailyCalorieTargetKcal: number
+  /** 每周自动备份，只保留最新一份 */
+  autoBackupWeekly: boolean
+  lastBackupAt?: number
+}
+
+export interface BackupRecord {
+  id?: number
+  createdAt: number
+  size: number
+  data: string
 }
 
 export interface CaffeinePoint {

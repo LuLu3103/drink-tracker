@@ -44,6 +44,11 @@ interface DrinkState {
   toasts: ToastItem[]
   showToast: (message: string, type?: ToastType, duration?: number) => void
   hideToast: (id: string) => void
+  backup: { createdAt: number; size: number } | null
+  hideTemplate: (id: string) => Promise<void>
+  unhideTemplate: (id: string) => Promise<void>
+  createBackup: () => Promise<void>
+  restoreLatestBackup: () => Promise<void>
 }
 
 function calculateResidual(logs: DrinkLog[], atTime: number, halfLifeHours: number): number {
@@ -190,6 +195,7 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
       weeklyStats: [],
       monthlyStats: [],
       toasts: [],
+      backup: null,
 
       loadAll: async () => {
         await initDB()
@@ -233,6 +239,8 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
         const weeklyStats = getWeeklyStats(logs)
         const monthlyStats = getMonthlyStats(logs)
         
+        const latestBackup = await db.backups.orderBy('createdAt').last()
+
         set({
           templates,
           logs,
@@ -244,8 +252,15 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
           caffeineCurve,
           todayStats,
           weeklyStats,
-          monthlyStats
+          monthlyStats,
+          backup: latestBackup ? { createdAt: latestBackup.createdAt, size: latestBackup.size } : null,
         })
+
+        // 每周自动备份：只在打开应用时检查，备份后仅保留最新一份
+        const WEEK = 7 * 24 * 60 * 60 * 1000
+        if (finalSettings.autoBackupWeekly && Date.now() - (finalSettings.lastBackupAt ?? 0) > WEEK) {
+          await get().createBackup()
+        }
       },
       
       addTemplate: async (template) => {
@@ -399,6 +414,37 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
 
       hideToast: (id) => {
         set(state => ({ toasts: state.toasts.filter(t => t.id !== id) }))
+      },
+
+      hideTemplate: async (id) => {
+        await db.templates.update(id, { isHidden: true })
+        set(state => ({
+          templates: state.templates.map(t => (t.id === id ? { ...t, isHidden: true } : t)),
+        }))
+      },
+
+      unhideTemplate: async (id) => {
+        await db.templates.update(id, { isHidden: false })
+        set(state => ({
+          templates: state.templates.map(t => (t.id === id ? { ...t, isHidden: false } : t)),
+        }))
+      },
+
+      createBackup: async () => {
+        const { templates, logs, settings } = get()
+        const data = JSON.stringify({ version: 2, exportedAt: Date.now(), templates, logs, settings })
+        const rec = { createdAt: Date.now(), size: data.length, data }
+        await db.backups.clear()
+        await db.backups.add(rec)
+        const updated = { ...settings, lastBackupAt: rec.createdAt }
+        await db.settings.put(updated, 1)
+        set({ backup: { createdAt: rec.createdAt, size: rec.size }, settings: updated })
+      },
+
+      restoreLatestBackup: async () => {
+        const latest = await db.backups.orderBy('createdAt').last()
+        if (!latest) throw new Error('没有可用备份')
+        await get().importData(latest.data)
       },
       
       getTemplatesByCategory: (category) => {

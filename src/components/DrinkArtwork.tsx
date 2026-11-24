@@ -38,6 +38,14 @@ export const TINT_SWATCHES = [
   '#EC4899', '#F59E0B', '#10B981', '#64748B',
 ]
 
+/** 取插画主色，用于日历圆点、海报等 */
+export function artColor(art?: DrinkArt): string {
+  if (!art) return '#94A3B8'
+  if (art.tint) return art.tint
+  const p = PALETTES[art.style]
+  return p ? p.liquid : '#94A3B8'
+}
+
 export function fallbackArt(category: string, baseType?: string): DrinkArt {
   if (baseType === 'matcha') return { style: 'matcha', cup: 'cold', topping: 'none' }
   if (baseType === 'cocoa') return { style: 'cocoa', cup: 'hot', topping: 'cream' }
