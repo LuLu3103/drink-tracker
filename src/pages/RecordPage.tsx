@@ -85,23 +85,15 @@ export default function RecordPage({ onQuickRecord, onOpenPicker, onOpenCustomDr
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ backgroundColor: getRiskColor(riskLevel.level) + '15' }}>
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium text-white shrink-0" style={{ backgroundColor: getRiskColor(riskLevel.level) }}>
-                {riskLevel.label}
-              </span>
-              <span className="text-xs text-gray-600 dark:text-gray-300 truncate">
-                {cutoffInfo.isPast ? cutoffInfo.message : cutoffInfo.message}
-              </span>
-            </div>
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={{ backgroundColor: getRiskColor(riskLevel.level) + '15' }}>
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium text-white shrink-0" style={{ backgroundColor: getRiskColor(riskLevel.level) }}>
+              {riskLevel.label}
+            </span>
+            <span className="text-xs text-gray-600 dark:text-gray-300 flex-1 min-w-0">
+              {cutoffInfo.message}
+            </span>
+            {cutoffInfo.isPast && <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />}
           </div>
-
-          {cutoffInfo.isPast && (
-            <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{cutoffInfo.message}</span>
-            </div>
-          )}
         </div>
 
         <div className="card p-4">

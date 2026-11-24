@@ -83,10 +83,10 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="modal-backdrop" onClick={onClose} />
-      <div className="w-full bg-white dark:bg-gray-950 rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col animate-slide-up">
+      <div className="relative z-10 w-full bg-white dark:bg-gray-950 rounded-t-3xl shadow-xl max-h-[90vh] flex flex-col animate-slide-up">
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white/95 dark:bg-gray-950/95 backdrop-blur-sm z-10 rounded-t-3xl">
           <h2 className="text-lg font-semibold">设置</h2>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800">
+          <button onClick={onClose} aria-label="关闭" className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800">
             <X className="w-6 h-6" />
           </button>
         </div>

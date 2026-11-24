@@ -66,9 +66,10 @@ export default function CaffeineChart({ curve, bedtime, threshold }: CaffeineCha
       yAxis: {
         type: 'value',
         min: 0,
+        minInterval: 1,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: '#9CA3AF', fontSize: 10 },
+        axisLabel: { color: '#9CA3AF', fontSize: 10, formatter: (v: number) => String(Math.round(v)) },
         splitLine: { lineStyle: { color: 'rgba(156,163,175,0.18)' } },
       },
       series: [

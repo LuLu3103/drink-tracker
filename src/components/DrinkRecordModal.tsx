@@ -116,7 +116,7 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Dri
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="modal-backdrop" onClick={onClose} />
-      <div className="w-full bg-white dark:bg-gray-950 rounded-t-3xl shadow-xl max-h-[92vh] flex flex-col animate-slide-up">
+      <div className="relative z-10 w-full bg-white dark:bg-gray-950 rounded-t-3xl shadow-xl max-h-[92vh] flex flex-col animate-slide-up">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-semibold">记录饮品</h2>
           <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="关闭">
