@@ -86,7 +86,24 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
 
   const variant = variants[Math.min(variantIndex, Math.max(0, variants.length - 1))]
 
-  const previewCaffeine = variant ? variant.caffeineMg * amount : 0
+  // 模板值只是默认标准，实际记录时可以增减
+  const defaults = useMemo(
+    () =>
+      variant
+        ? {
+            caffeineMg: Math.round(variant.caffeineMg * amount),
+            sugarG: Math.round(variant.sugarG * amount * 10) / 10,
+            caloriesKcal: Math.round(variant.caloriesKcal * amount),
+          }
+        : { caffeineMg: 0, sugarG: 0, caloriesKcal: 0 },
+    [variant, amount],
+  )
+
+  const [values, setValues] = useState(defaults)
+  useEffect(() => {
+    setValues(defaults)
+  }, [defaults])
+
   const estimatedBed = useMemo(() => {
     if (!picked || !variant) return bedtimeResidual
     const [h, m] = settings.bedtime.split(':').map(Number)
@@ -95,8 +112,8 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
     if (bed.getTime() <= consumedAt) bed.setDate(bed.getDate() + 1)
     const hours = (bed.getTime() - consumedAt) / 3600000
     const decay = hours > 0 ? Math.pow(0.5, hours / settings.halfLifeHours) : 1
-    return bedtimeResidual + previewCaffeine * decay
-  }, [picked, variant, consumedAt, bedtimeResidual, previewCaffeine, settings.bedtime, settings.halfLifeHours])
+    return bedtimeResidual + values.caffeineMg * decay
+  }, [picked, variant, consumedAt, bedtimeResidual, values.caffeineMg, settings.bedtime, settings.halfLifeHours])
 
   const threshold = settings.sleepResidualThresholdMg
   const level = estimatedBed < threshold ? 'low' : estimatedBed < threshold * 2 ? 'medium' : 'high'
@@ -114,9 +131,9 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
         category: picked.category,
         baseType: picked.baseType,
         size: variant.label,
-        caffeineMg: Math.round(variant.caffeineMg * amount),
-        sugarG: Math.round(variant.sugarG * amount * 10) / 10,
-        caloriesKcal: Math.round(variant.caloriesKcal * amount),
+        caffeineMg: Math.round(values.caffeineMg),
+        sugarG: Math.round(values.sugarG * 10) / 10,
+        caloriesKcal: Math.round(values.caloriesKcal),
         art: picked.art,
         consumedAt,
       })
@@ -273,19 +290,58 @@ export function DrinkRecordModal({ isOpen, onClose, template, initialTime }: Pro
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-2xl bg-white py-2.5 dark:bg-slate-900">
-                  <p className="text-[17px] font-semibold text-brand-600">{Math.round(previewCaffeine)}</p>
-                  <p className="text-[10.5px] text-ink-400">mg 咖啡因</p>
+              <div>
+                <div className="mb-1.5 flex items-baseline justify-between">
+                  <p className="text-[12px] text-ink-400">本次实际摄入（可修改）</p>
+                  <button
+                    onClick={() => setValues(defaults)}
+                    className="text-[11.5px] font-medium text-brand-600"
+                  >
+                    恢复默认
+                  </button>
                 </div>
-                <div className="rounded-2xl bg-white py-2.5 dark:bg-slate-900">
-                  <p className="text-[17px] font-semibold text-amber-500">{(variant.sugarG * amount).toFixed(1)}</p>
-                  <p className="text-[10.5px] text-ink-400">g 糖</p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-2xl bg-white py-2 dark:bg-slate-900">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      aria-label="本次咖啡因"
+                      value={values.caffeineMg}
+                      onChange={e => setValues({ ...values, caffeineMg: Number(e.target.value) })}
+                      className="w-full bg-transparent text-center text-[17px] font-semibold text-brand-600 outline-none"
+                    />
+                    <p className="text-[10.5px] text-ink-400">mg 咖啡因</p>
+                  </div>
+                  <div className="rounded-2xl bg-white py-2 dark:bg-slate-900">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.1"
+                      aria-label="本次糖"
+                      value={values.sugarG}
+                      onChange={e => setValues({ ...values, sugarG: Number(e.target.value) })}
+                      className="w-full bg-transparent text-center text-[17px] font-semibold text-amber-500 outline-none"
+                    />
+                    <p className="text-[10.5px] text-ink-400">g 糖</p>
+                  </div>
+                  <div className="rounded-2xl bg-white py-2 dark:bg-slate-900">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      aria-label="本次热量"
+                      value={values.caloriesKcal}
+                      onChange={e => setValues({ ...values, caloriesKcal: Number(e.target.value) })}
+                      className="w-full bg-transparent text-center text-[17px] font-semibold text-rose-500 outline-none"
+                    />
+                    <p className="text-[10.5px] text-ink-400">kcal</p>
+                  </div>
                 </div>
-                <div className="rounded-2xl bg-white py-2.5 dark:bg-slate-900">
-                  <p className="text-[17px] font-semibold text-rose-500">{Math.round(variant.caloriesKcal * amount)}</p>
-                  <p className="text-[10.5px] text-ink-400">kcal</p>
-                </div>
+                <p className="mt-1.5 text-center text-[10.5px] text-ink-400">
+                  默认按「{variant.label}」估算，改杯型或份量会重新计算
+                </p>
               </div>
 
               <div className="space-y-1.5 rounded-2xl bg-white p-3.5 text-[12.5px] dark:bg-slate-900">
