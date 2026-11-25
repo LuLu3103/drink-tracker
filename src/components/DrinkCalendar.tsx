@@ -140,11 +140,11 @@ export function DrinkCalendar({ logs }: { logs: DrinkLog[] }) {
                 (isToday ? ' ring-1 ring-brand-400' : '')
               }
             >
-              <span className={'absolute left-1 top-0.5 text-[9px] ' + (dayLogs.length ? 'text-ink-500' : 'text-ink-400/60')}>
-                {day}
-              </span>
+              {dayLogs.length === 0 && (
+                <span className="text-[11px] text-ink-400/70">{day}</span>
+              )}
               {first && (
-                <DrinkArtwork art={first.art ?? fallbackArt(first.category, first.baseType)} size={22} className="mt-1.5" />
+                <DrinkArtwork art={first.art ?? fallbackArt(first.category, first.baseType)} size={26} />
               )}
               {dayLogs.length > 1 && (
                 <span className="absolute bottom-0.5 text-[8px] text-ink-400">+{dayLogs.length - 1}</span>

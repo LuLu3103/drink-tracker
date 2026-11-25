@@ -263,9 +263,17 @@ export const BUILTIN_TEMPLATES: Array<Omit<DrinkTemplate, 'createdAt'>> = BASE_T
 )
 
 export async function initDB(): Promise<void> {
-  const settingsCount = await db.settings.count()
-  if (settingsCount === 0) {
-    await db.settings.add(DEFAULT_SETTINGS)
+  // 设置只允许存在 id=1 的一行。
+  // 历史版本用 out-of-line key 写入过，可能产生 id=2/3 的重复行，
+  // 导致读取 get(1) 拿到旧值（表现为「刷新后设置被重置」），这里自动归一化。
+  const rows = (await db.settings.toArray()) as Array<Settings & { id?: number }>
+  if (rows.length === 0) {
+    await db.settings.put({ ...DEFAULT_SETTINGS, id: 1 } as Settings)
+  } else if (rows.length !== 1 || rows[0].id !== 1) {
+    const newest = rows.reduce((a, b) => ((b.id ?? 0) > (a.id ?? 0) ? b : a))
+    const merged = { ...DEFAULT_SETTINGS, ...newest, id: 1 }
+    await db.settings.clear()
+    await db.settings.put(merged as Settings)
   }
 
   const now = Date.now()

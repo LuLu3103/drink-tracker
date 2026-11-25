@@ -6,7 +6,7 @@ import { DrinkRecordModal } from '@/components/DrinkRecordModal'
 import { formatTime, formatRelativeTime } from '@/utils/format'
 import { Trash2, Pencil, Copy, Plus, Check, X, CalendarDays } from 'lucide-react'
 
-type Filter = 'today' | '48h' | 'all'
+type Filter = '48h' | 'week' | 'all'
 
 function toLocalInput(ts: number): string {
   const d = new Date(ts)
@@ -36,19 +36,16 @@ export default function TimelinePage() {
   const deleteLog = useDrinkStore(s => s.deleteLog)
   const showToast = useDrinkStore(s => s.showToast)
 
-  const [filter, setFilter] = useState<Filter>('today')
+  const [filter, setFilter] = useState<Filter>('48h')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ caffeineMg: 0, sugarG: 0, caloriesKcal: 0, consumedAt: 0 })
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [composeOpen, setComposeOpen] = useState(false)
 
   const filtered = useMemo(() => {
-    if (filter === 'today') {
-      const start = new Date()
-      start.setHours(0, 0, 0, 0)
-      return logs.filter(l => l.consumedAt >= start.getTime())
-    }
-    if (filter === '48h') return logs.filter(l => l.consumedAt >= Date.now() - 48 * 3600 * 1000)
+    const now = Date.now()
+    if (filter === '48h') return logs.filter(l => l.consumedAt >= now - 48 * 3600 * 1000)
+    if (filter === 'week') return logs.filter(l => l.consumedAt >= now - 7 * 24 * 3600 * 1000)
     return logs
   }, [logs, filter])
 
@@ -106,7 +103,7 @@ export default function TimelinePage() {
         </header>
 
         <div className="inline-flex rounded-2xl bg-slate-100 p-1 dark:bg-slate-800">
-          {(['today', '48h', 'all'] as Filter[]).map(f => (
+          {(['48h', 'week', 'all'] as Filter[]).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -115,7 +112,7 @@ export default function TimelinePage() {
                 (filter === f ? 'bg-white text-ink-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-ink-400')
               }
             >
-              {f === 'today' ? '今天' : f === '48h' ? '48 小时' : '全部'}
+              {f === '48h' ? '48 小时' : f === 'week' ? '一周内' : '全部'}
             </button>
           ))}
         </div>

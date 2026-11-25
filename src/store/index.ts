@@ -329,8 +329,8 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
       
       updateSettings: async (newSettings) => {
         const updatedSettings = { ...get().settings, ...newSettings }
-        await db.settings.put(updatedSettings, 1)
-        set({ settings: updatedSettings })
+        await db.settings.put({ ...updatedSettings, id: 1 } as Settings)
+        set({ settings: { ...updatedSettings } })
         get().recalculate()
       },
       
@@ -387,7 +387,7 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
             await db.logs.bulkAdd(data.logs)
           }
           if (data.settings) {
-            await db.settings.put(data.settings, 1)
+            await db.settings.put({ ...data.settings, id: 1 } as Settings)
           }
           await get().loadAll()
         } catch (error) {
@@ -399,7 +399,7 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
         await db.templates.clear()
         await db.logs.clear()
         await db.settings.clear()
-        await db.settings.add(DEFAULT_SETTINGS)
+        await db.settings.put({ ...DEFAULT_SETTINGS, id: 1 } as Settings)
         await get().loadAll()
       },
 
@@ -446,14 +446,24 @@ export const useDrinkStore = create<DrinkState>()((set, get) => ({
         await db.backups.clear()
         await db.backups.add(rec)
         const updated = { ...settings, lastBackupAt: rec.createdAt }
-        await db.settings.put(updated, 1)
+        await db.settings.put({ ...updated, id: 1 } as Settings)
         set({ backup: { createdAt: rec.createdAt, size: rec.size }, settings: updated })
       },
 
       restoreLatestBackup: async () => {
         const latest = await db.backups.orderBy('createdAt').last()
         if (!latest) throw new Error('没有可用备份')
-        await get().importData(latest.data)
+        const data = JSON.parse(latest.data)
+        // 只恢复饮品库与记录，保留当前偏好设置（就寝时间、半衰期、目标、自动备份开关）
+        if (data.templates) {
+          await db.templates.clear()
+          await db.templates.bulkAdd(data.templates)
+        }
+        if (data.logs) {
+          await db.logs.clear()
+          await db.logs.bulkAdd(data.logs)
+        }
+        await get().loadAll()
       },
       
       getTemplatesByCategory: (category) => {
