@@ -31,8 +31,9 @@ export const DEFAULT_SETTINGS: Settings = {
   sleepResidualThresholdMg: 30,
   dailyCaffeineTargetMg: 300,
   dailySugarTargetG: 25,
-  dailyCalorieTargetKcal: 2000,
+  dailyCalorieTargetKcal: 1000,
   autoBackupWeekly: false,
+  calorieMigrated: true,
 }
 
 const SOURCE = '品牌公开信息 / 常见检测汇总，估算值'
@@ -267,14 +268,22 @@ export async function initDB(): Promise<void> {
   // 历史版本用 out-of-line key 写入过，可能产生 id=2/3 的重复行，
   // 导致读取 get(1) 拿到旧值（表现为「刷新后设置被重置」），这里自动归一化。
   const rows = (await db.settings.toArray()) as Array<Settings & { id?: number }>
-  if (rows.length === 0) {
-    await db.settings.put({ ...DEFAULT_SETTINGS, id: 1 } as Settings)
-  } else if (rows.length !== 1 || rows[0].id !== 1) {
-    const newest = rows.reduce((a, b) => ((b.id ?? 0) > (a.id ?? 0) ? b : a))
-    const merged = { ...DEFAULT_SETTINGS, ...newest, id: 1 }
-    await db.settings.clear()
-    await db.settings.put(merged as Settings)
+  const newest = rows.length
+    ? rows.reduce((a, b) => ((b.id ?? 0) > (a.id ?? 0) ? b : a))
+    : (DEFAULT_SETTINGS as Settings & { id?: number })
+
+  const merged = { ...DEFAULT_SETTINGS, ...newest }
+
+  // v3 迁移：每日热量默认值从 2000 调整为 1000（仅迁移从未手动改过的老数据）
+  // 注意：要判断数据库里那一行自己的标记，而不是合并 DEFAULT_SETTINGS 之后的值
+  const migratedBefore = (newest as Settings & { calorieMigrated?: boolean }).calorieMigrated === true
+  if (!migratedBefore && merged.dailyCalorieTargetKcal === 2000) {
+    merged.dailyCalorieTargetKcal = 1000
   }
+  merged.calorieMigrated = true
+
+  await db.settings.clear()
+  await db.settings.put({ ...merged, id: 1 } as Settings)
 
   const now = Date.now()
   const builtinIds = new Set(BUILTIN_TEMPLATES.map(t => t.id))

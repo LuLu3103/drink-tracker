@@ -158,6 +158,12 @@ export async function initDB(): Promise<void> {
     state.settings = { ...DEFAULT_SETTINGS }
   }
 
+  // v3 迁移：每日热量默认值 2000 → 1000
+  if (!state.settings.calorieMigrated && state.settings.dailyCalorieTargetKcal === 2000) {
+    state.settings.dailyCalorieTargetKcal = 1000
+  }
+  state.settings.calorieMigrated = true
+
   const now = Date.now()
   const builtinIds = new Set(BUILTIN_TEMPLATES.map(t => t.id))
 

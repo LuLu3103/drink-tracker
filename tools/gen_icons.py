@@ -1,82 +1,82 @@
 from PIL import Image, ImageDraw
-import os, math
+import os
 
 OUT = r"D:/APP/Deepseek Harness/Work program/public space/drink-tracker/public/icons"
 os.makedirs(OUT, exist_ok=True)
 
 SIZES = [72, 96, 128, 144, 152, 180, 192, 384, 512]
-SS = 4
-BASE = 512 * SS
+SS = 8                      # 超采样倍数
+BASE = 64 * SS             # 逻辑坐标 64x64，和 Logo.tsx 一致
 
-img = Image.new("RGBA", (BASE, BASE), (0, 0, 0, 0))
-grad = Image.new("RGBA", (BASE, BASE))
-gd = ImageDraw.Draw(grad)
-c1 = (255, 149, 0)
-c2 = (139, 105, 20)
-for y in range(BASE):
-    t = y / (BASE - 1)
-    gd.line([(0, y), (BASE, y)], fill=(
-        int(c1[0] + (c2[0] - c1[0]) * t),
-        int(c1[1] + (c2[1] - c1[1]) * t),
-        int(c1[2] + (c2[2] - c1[2]) * t),
-        255,
-    ))
-mask = Image.new("L", (BASE, BASE), 0)
-ImageDraw.Draw(mask).rounded_rectangle([0, 0, BASE - 1, BASE - 1], radius=int(BASE * 0.22), fill=255)
-img.paste(grad, (0, 0), mask)
-d = ImageDraw.Draw(img)
+BLUE_TOP = (59, 130, 246)   # #3B82F6
+BLUE_BOTTOM = (29, 78, 216) # #1D4ED8
 
-W = (255, 255, 255, 255)
-cw = BASE * 0.42
-ch = BASE * 0.34
-cx = BASE * 0.50
-top = BASE * 0.45
-left, right = cx - cw / 2, cx + cw / 2
-bottom = top + ch
-stroke = int(BASE * 0.034)
+def gradient(size):
+    img = Image.new("RGBA", (size, size))
+    px = img.load()
+    for y in range(size):
+        for x in range(size):
+            # 对角线渐变，和 CSS linear-gradient(135deg) 接近
+            t = ((x + y) / (2 * size - 2))
+            r = int(BLUE_TOP[0] + (BLUE_BOTTOM[0] - BLUE_TOP[0]) * t)
+            g = int(BLUE_TOP[1] + (BLUE_BOTTOM[1] - BLUE_TOP[1]) * t)
+            b = int(BLUE_TOP[2] + (BLUE_BOTTOM[2] - BLUE_TOP[2]) * t)
+            px[x, y] = (r, g, b, 255)
+    return img
 
-# steam: smooth sine waves with round caps
-def steam(xc, y0, y1, amp, phase):
-    pts = []
-    steps = 40
-    for i in range(steps + 1):
-        t = i / steps
-        y = y0 + (y1 - y0) * t
-        x = xc + amp * math.sin(phase + t * math.pi * 2.2) * (1 - 0.25 * t)
-        pts.append((x, y))
-    d.line(pts, fill=(255, 255, 255, 240), width=int(stroke * 0.78), joint="curve")
-    r = stroke * 0.39
-    for p in (pts[0], pts[-1]):
-        d.ellipse([p[0] - r, p[1] - r, p[0] + r, p[1] + r], fill=(255, 255, 255, 240))
+def draw_cup(d, s, cx=None, cy=None, scale=1.0):
+    """在 64 逻辑单位坐标系里画杯子，s 为像素/逻辑单位"""
+    def X(v): return (v if cx is None else (v - 32) * scale + 32) * s
+    def Y(v): return (v if cy is None else (v - 32) * scale + 32) * s
+    def S(v): return v * s * scale
 
-steam(cx - cw * 0.19, top - ch * 0.46, top - stroke * 0.9, cw * 0.055, 0.0)
-steam(cx + cw * 0.19, top - ch * 0.40, top - stroke * 0.9, cw * 0.055, math.pi)
+    white = (255, 255, 255, 255)
 
-# handle behind body
-hx0 = right - stroke * 0.5
-hx1 = right + cw * 0.24
-hy0 = top + ch * 0.18
-hy1 = top + ch * 0.66
-d.arc([hx0, hy0, hx1, hy1], start=-88, end=88, fill=W, width=stroke)
+    # 蒸汽
+    for x0 in (26.5, 37.5):
+        d.line([(X(x0), Y(19.5)), (X(x0 + 1.2), Y(15.2))], fill=white, width=int(S(2.4)))
+        # 圆头
+        r = S(1.2)
+        for px, py in ((X(x0), Y(19.5)), (X(x0 + 1.2), Y(15.2))):
+            d.ellipse([px - r, py - r, px + r, py + r], fill=white)
 
-# cup body
-body = [(left, top), (right, top), (right - cw * 0.09, bottom), (left + cw * 0.09, bottom)]
-d.line(body + [body[0]], fill=W, width=stroke, joint="curve")
+    # 杯盖
+    d.rounded_rectangle([X(18), Y(21), X(46), Y(26)], radius=S(2), fill=white)
 
-# saucer
-sy = bottom + stroke * 0.75
-d.line([(left - cw * 0.18, sy), (right + cw * 0.02, sy)], fill=W, width=stroke)
-for p in ((left - cw * 0.18, sy), (right + cw * 0.02, sy)):
-    r = stroke / 2
-    d.ellipse([p[0] - r, p[1] - r, p[0] + r, p[1] + r], fill=W)
+    # 杯身（上宽下窄）
+    body = [(X(20), Y(26)), (X(44), Y(26)), (X(41.4), Y(48.6)), (X(22.6), Y(48.6))]
+    d.polygon(body, fill=white)
+
+    # 液体（淡蓝，35% 不透明度叠在白底上）
+    liquid = (
+        (int(255 * 0.65 + BLUE_TOP[0] * 0.35), int(255 * 0.65 + BLUE_TOP[1] * 0.35), int(255 * 0.65 + BLUE_TOP[2] * 0.35), 255)
+    )
+    d.polygon([(X(25), Y(33.5)), (X(39), Y(33.5)), (X(37.4), Y(45.5)), (X(26.6), Y(45.5))], fill=liquid)
+
+def make_icon(size, maskable=False):
+    img = Image.new("RGBA", (size * SS, size * SS), (0, 0, 0, 0))
+    grad = gradient(size * SS)
+
+    if maskable:
+        # 满幅背景，系统自行裁切
+        img.paste(grad, (0, 0))
+        d = ImageDraw.Draw(img)
+        draw_cup(d, size * SS / 64, scale=0.72)
+    else:
+        mask = Image.new("L", (size * SS, size * SS), 0)
+        ImageDraw.Draw(mask).rounded_rectangle(
+            [0, 0, size * SS - 1, size * SS - 1], radius=int(size * SS * 18 / 64), fill=255
+        )
+        img.paste(grad, (0, 0), mask)
+        d = ImageDraw.Draw(img)
+        draw_cup(d, size * SS / 64)
+
+    return img.resize((size, size), Image.LANCZOS)
 
 for s in SIZES:
-    img.resize((s, s), Image.LANCZOS).save(os.path.join(OUT, "icon-%dx%d.png" % (s, s)), "PNG", optimize=True)
+    make_icon(s).save(os.path.join(OUT, "icon-%dx%d.png" % (s, s)), "PNG", optimize=True)
 
-mb_inner = img.resize((int(BASE * 0.76), int(BASE * 0.76)), Image.LANCZOS)
-mb = Image.new("RGBA", (BASE, BASE), (0, 0, 0, 0))
-mb.paste(mb_inner, ((BASE - mb_inner.width) // 2, (BASE - mb_inner.height) // 2), mb_inner)
-for s in [192, 512]:
-    mb.resize((s, s), Image.LANCZOS).save(os.path.join(OUT, "maskable-%dx%d.png" % (s, s)), "PNG", optimize=True)
+for s in (192, 512):
+    make_icon(s, maskable=True).save(os.path.join(OUT, "maskable-%dx%d.png" % (s, s)), "PNG", optimize=True)
 
-print("done")
+print("icons regenerated:", sorted(os.listdir(OUT)))

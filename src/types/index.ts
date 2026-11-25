@@ -88,6 +88,8 @@ export interface Settings {
   /** 每周自动备份，只保留最新一份 */
   autoBackupWeekly: boolean
   lastBackupAt?: number
+  /** 热量默认值从 2000 迁移到 1000 后置为 true */
+  calorieMigrated?: boolean
 }
 
 export interface BackupRecord {
